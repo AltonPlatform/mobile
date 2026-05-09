@@ -2,7 +2,7 @@ import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useTranslation} from 'react-i18next';
-import {Platform, StyleSheet} from 'react-native';
+import {Platform} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {
@@ -14,7 +14,7 @@ import {
 } from '../components/TabIcons';
 import {HomeScreen} from '../screens/HomeScreen';
 import {useUserContext} from '../context/UserContext';
-import {colors, radii} from '../theme/tokens';
+import {colors} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
 import {RouletteScreen} from '../screens/RouletteScreen';
 import {BoostsScreen} from '../screens/BoostsScreen';
@@ -93,20 +93,21 @@ function AcademyStackNav() {
 
 const Tab = createBottomTabNavigator();
 
-function TabBarIconHome({color}: {color: string}) {
-  return <TabIconHome color={color} size={24} />;
+/** Параметры иконки как у React Navigation (размер из темы, цвет active/inactive). */
+function TabBarIconHome({color, size = 24}: {color: string; size?: number}) {
+  return <TabIconHome color={color} size={size} />;
 }
-function TabBarIconBoosts({color}: {color: string}) {
-  return <TabIconBoosts color={color} size={24} />;
+function TabBarIconBoosts({color, size = 24}: {color: string; size?: number}) {
+  return <TabIconBoosts color={color} size={size} />;
 }
-function TabBarIconAcademy({color}: {color: string}) {
-  return <TabIconAcademy color={color} size={24} />;
+function TabBarIconAcademy({color, size = 24}: {color: string; size?: number}) {
+  return <TabIconAcademy color={color} size={size} />;
 }
-function TabBarIconMissions({color}: {color: string}) {
-  return <TabIconMissions color={color} size={24} />;
+function TabBarIconMissions({color, size = 24}: {color: string; size?: number}) {
+  return <TabIconMissions color={color} size={size} />;
 }
-function TabBarIconFriends({color}: {color: string}) {
-  return <TabIconFriends color={color} size={24} />;
+function TabBarIconFriends({color, size = 24}: {color: string; size?: number}) {
+  return <TabIconFriends color={color} size={size} />;
 }
 
 export function MainTabs() {
@@ -130,25 +131,33 @@ export function MainTabs() {
       screenOptions={{
         headerShown: false,
         sceneStyle: {backgroundColor: colors.bg},
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.tabInactive,
+        /** [BottomNavigation.css](frontend/src/assets/css/BottomNavigation.css) */
+        tabBarActiveTintColor: '#e62159',
+        tabBarInactiveTintColor: '#757f9c',
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '500',
           fontFamily: fontFamily.medium,
-          marginBottom: 2,
+          marginTop: 0,
+          marginBottom: 0,
+        },
+        tabBarIconStyle: {
+          marginBottom: 5,
+        },
+        tabBarItemStyle: {
+          flex: 1,
         },
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: colors.border,
+          backgroundColor: '#161c2c',
+          borderTopWidth: 1,
+          borderTopColor: '#46506d',
           borderLeftWidth: 0,
           borderRightWidth: 0,
-          borderTopLeftRadius: radii.lg,
-          borderTopRightRadius: radii.lg,
-          paddingTop: 10,
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          paddingTop: 16,
           paddingBottom: Math.max(16, insets.bottom),
-          minHeight: 58 + Math.max(0, insets.bottom),
+          minHeight: 76 + Math.max(0, insets.bottom),
           ...Platform.select({
             ios: {
               shadowColor: '#000',
@@ -182,13 +191,18 @@ export function MainTabs() {
         name="Academy"
         component={AcademyStackNav}
         options={{
-          tabBarLabel: 'Academy',
+          tabBarLabel: t('Academy'),
           tabBarBadge: academyBadge,
           tabBarBadgeStyle: {
-            backgroundColor: colors.badge,
-            color: colors.textPrimary,
-            fontSize: 11,
+            backgroundColor: '#881032',
+            color: '#ffffff',
+            fontSize: 12,
             fontFamily: fontFamily.medium,
+            fontWeight: '500',
+            minWidth: 20,
+            maxHeight: 20,
+            lineHeight: 14,
+            borderRadius: 100,
           },
           tabBarIcon: TabBarIconAcademy,
         }}
@@ -205,7 +219,7 @@ export function MainTabs() {
         name="Friends"
         component={FriendsScreen}
         options={{
-          tabBarLabel: t('Ref'),
+          tabBarLabel: t('Friends'),
           tabBarIcon: TabBarIconFriends,
         }}
       />
