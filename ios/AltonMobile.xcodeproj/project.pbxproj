@@ -8,12 +8,22 @@
 
 /* Begin PBXBuildFile section */
 		00E356F31AD99517003FC87E /* AltonMobileTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 00E356F21AD99517003FC87E /* AltonMobileTests.m */; };
+		017D6B1F7FE043C99A6D71C2 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 17881A540C754AED8D0B29C1 /* Inter-Regular.ttf */; };
 		0C80B921A6F3F58F76C31292 /* libPods-AltonMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-AltonMobile.a */; };
 		13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
+		2ACE14E323E34C0B94BEFE19 /* Inter-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E8F318DB295A4DA6869E4F89 /* Inter-Medium.ttf */; };
+		370F5399C34E4E3EAEA9A265 /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ABE7135574774CE2B92E57AF /* Inter-Bold.ttf */; };
+		3D1AD8B35DC74669BAD33B25 /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 17881A540C754AED8D0B29C1 /* Inter-Regular.ttf */; };
+		4DF1DE02C6BD4B2458C1F1C0 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		667E77E1412B48AB99D6E20A /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ABE7135574774CE2B92E57AF /* Inter-Bold.ttf */; };
+		7111EA7C66D7449A9008A8A6 /* Inter-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E8F318DB295A4DA6869E4F89 /* Inter-Medium.ttf */; };
 		7699B88040F8A987B510C191 /* libPods-AltonMobile-AltonMobileTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 19F6CBCC0A4E27FBF8BF4A61 /* libPods-AltonMobile-AltonMobileTests.a */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		C5C5A4DBFC294E0C81DD3E9A /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2C0F0686D9C64B54AABC67C8 /* Inter-SemiBold.ttf */; };
+		D4E5F6A01A68108700A75B9A /* TelegramLoginModule.m in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6A11A68108700A75B9A /* TelegramLoginModule.m */; };
+		EDA7462DDAEC4BBA889A8AD4 /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2C0F0686D9C64B54AABC67C8 /* Inter-SemiBold.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,13 +47,18 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = AltonMobile/Info.plist; sourceTree = "<group>"; };
 		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = AltonMobile/main.m; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = AltonMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		17881A540C754AED8D0B29C1 /* Inter-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Regular.ttf"; path = "../assets/fonts/Inter-Regular.ttf"; sourceTree = "<group>"; };
 		19F6CBCC0A4E27FBF8BF4A61 /* libPods-AltonMobile-AltonMobileTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-AltonMobile-AltonMobileTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2C0F0686D9C64B54AABC67C8 /* Inter-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-SemiBold.ttf"; path = "../assets/fonts/Inter-SemiBold.ttf"; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-AltonMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AltonMobile.debug.xcconfig"; path = "Target Support Files/Pods-AltonMobile/Pods-AltonMobile.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-AltonMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AltonMobile.release.xcconfig"; path = "Target Support Files/Pods-AltonMobile/Pods-AltonMobile.release.xcconfig"; sourceTree = "<group>"; };
 		5B7EB9410499542E8C5724F5 /* Pods-AltonMobile-AltonMobileTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AltonMobile-AltonMobileTests.debug.xcconfig"; path = "Target Support Files/Pods-AltonMobile-AltonMobileTests/Pods-AltonMobile-AltonMobileTests.debug.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-AltonMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-AltonMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = AltonMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		89C6BE57DB24E9ADA2F236DE /* Pods-AltonMobile-AltonMobileTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AltonMobile-AltonMobileTests.release.xcconfig"; path = "Target Support Files/Pods-AltonMobile-AltonMobileTests/Pods-AltonMobile-AltonMobileTests.release.xcconfig"; sourceTree = "<group>"; };
+		ABE7135574774CE2B92E57AF /* Inter-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Bold.ttf"; path = "../assets/fonts/Inter-Bold.ttf"; sourceTree = "<group>"; };
+		D4E5F6A11A68108700A75B9A /* TelegramLoginModule.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TelegramLoginModule.m; path = AltonMobile/TelegramLoginModule.m; sourceTree = "<group>"; };
+		E8F318DB295A4DA6869E4F89 /* Inter-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Medium.ttf"; path = "../assets/fonts/Inter-Medium.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -89,6 +104,7 @@
 			children = (
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
+				D4E5F6A11A68108700A75B9A /* TelegramLoginModule.m */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -124,6 +140,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				F967177FF69A4433BDF72994 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -148,6 +165,17 @@
 				89C6BE57DB24E9ADA2F236DE /* Pods-AltonMobile-AltonMobileTests.release.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		F967177FF69A4433BDF72994 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				E8F318DB295A4DA6869E4F89 /* Inter-Medium.ttf */,
+				ABE7135574774CE2B92E57AF /* Inter-Bold.ttf */,
+				17881A540C754AED8D0B29C1 /* Inter-Regular.ttf */,
+				2C0F0686D9C64B54AABC67C8 /* Inter-SemiBold.ttf */,
+			);
+			name = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -236,6 +264,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7111EA7C66D7449A9008A8A6 /* Inter-Medium.ttf in Resources */,
+				370F5399C34E4E3EAEA9A265 /* Inter-Bold.ttf in Resources */,
+				017D6B1F7FE043C99A6D71C2 /* Inter-Regular.ttf in Resources */,
+				EDA7462DDAEC4BBA889A8AD4 /* Inter-SemiBold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,6 +277,11 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
+				4DF1DE02C6BD4B2458C1F1C0 /* PrivacyInfo.xcprivacy in Resources */,
+				2ACE14E323E34C0B94BEFE19 /* Inter-Medium.ttf in Resources */,
+				667E77E1412B48AB99D6E20A /* Inter-Bold.ttf in Resources */,
+				3D1AD8B35DC74669BAD33B25 /* Inter-Regular.ttf in Resources */,
+				C5C5A4DBFC294E0C81DD3E9A /* Inter-SemiBold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -395,6 +432,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
+				D4E5F6A01A68108700A75B9A /* TelegramLoginModule.m in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -431,7 +469,7 @@
 					"-lc++",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.altonmobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AltonMobile.app/AltonMobile";
 			};
@@ -455,7 +493,7 @@
 					"-lc++",
 					"$(inherited)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.altonmobile.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AltonMobile.app/AltonMobile";
 			};
@@ -481,7 +519,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.altonTrader;
 				PRODUCT_NAME = AltonMobile;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -508,7 +546,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "org.reactjs.native.example.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.altonTrader;
 				PRODUCT_NAME = AltonMobile;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -576,6 +614,10 @@
 				);
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-DFOLLY_NO_CONFIG",
@@ -583,8 +625,13 @@
 					"-DFOLLY_USE_LIBCPP=1",
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
 				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -641,6 +688,10 @@
 					"\"$(inherited)\"",
 				);
 				MTL_ENABLE_DEBUG_INFO = NO;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(OTHER_CFLAGS)",
 					"-DFOLLY_NO_CONFIG",
@@ -648,8 +699,12 @@
 					"-DFOLLY_USE_LIBCPP=1",
 					"-DFOLLY_CFG_NO_COROUTINES=1",
 					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
 				);
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

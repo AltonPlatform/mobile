@@ -1,79 +1,52 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Alton Mobile (React Native)
 
-# Getting Started
+Bare React Native app mirroring the Telegram Mini App: mining, roulette, boosts, academy, missions, friends, profile, wallet.
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+## Prerequisites
 
-## Step 1: Start the Metro Server
+- Node 18+, Xcode (iOS), Android Studio (Android)
+- Backend running (`backend`, default `http://localhost:3000`). Emulators: Android uses `10.0.2.2:3000`, iOS uses `localhost:3000` — see `src/config.ts`.
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
-
-To start Metro, run the following command from the _root_ of your React Native project:
-
-```bash
-# using npm
-npm start
-
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Start your Application
-
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
-
-### For Android
+## Install
 
 ```bash
-# using npm
-npm run android
-
-# OR using Yarn
-yarn android
+cd mobile
+npm install
 ```
 
-### For iOS
+### iOS
+
+Используйте Bundler из `ios/Gemfile` (голый `pod install` на Ruby 3.2+ часто падает на `ActiveSupport::Logger`).
 
 ```bash
-# using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+cd ios && bundle install && bundle exec pod install && cd ..
+npx react-native run-ios
 ```
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+Или из каталога `mobile`: `npm run ios:pods`, затем `npx react-native run-ios`.
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+### Android
 
-## Step 3: Modifying your App
+```bash
+npx react-native run-android
+```
 
-Now that you have successfully run the app, let's modify it.
+## Environment / secrets
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
+| Item | Where |
+|------|--------|
+| **API** | `src/config.ts` → `API_BASE_URL` for production |
+| **Appodeal** | `src/config.ts` → `APPODEAL_APP_KEY` |
+| **Telegram OIDC** | Backend `TELEGRAM_CLIENT_ID` (see `backend/.env.example`) |
+| **Telegram Login SDK (Android)** | GitHub Packages Maven + `GITHUB_TOKEN` — [telegram-login-android](https://github.com/TelegramMessenger/telegram-login-android). Replace stub in `TelegramLoginModule.kt` with `TelegramLogin.startLogin` / `handleLoginResponse`. |
+| **Telegram Login SDK (iOS)** | Add SPM `https://github.com/TelegramMessenger/telegram-login-ios`, replace stub in `TelegramLoginModule.m`, Universal Links |
 
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
+Until native SDKs return a real `id_token`, use **Login** screen **Dev login** (debug builds): paste JWT from Telegram OAuth and call `POST /api/login/telegram-sdk`.
 
-## Congratulations! :tada:
+## Backend
 
-You've successfully run and modified your React Native App. :partying_face:
+New endpoint: `POST /api/login/telegram-sdk` with `{ idToken, referrerId? }`. Requires `TELEGRAM_CLIENT_ID` in backend `.env`.
 
-### Now what?
+## Ads
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Appodeal Rewarded Video is initialized in `App.tsx`. Mining ×2, roulette extra spin, academy retry use `src/hooks/useAppodeal.ts` (FIFO reward callbacks).
