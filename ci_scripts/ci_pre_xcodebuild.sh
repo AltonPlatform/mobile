@@ -1,54 +1,52 @@
 #!/bin/sh
-# Standalone mobile repo: подстраховка перед xcodebuild (Debug и Release Pods).
-set -eu
+# Подстраховка: если Pods не собраны после post_clone — те же шаги, что в ci_post_clone.sh.
+set -e
 
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export HOMEBREW_NO_ANALYTICS=1
-export COCOAPODS_DISABLE_STATS=true
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-export GIT_TERMINAL_PROMPT=0
 
 SCRIPT_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-MOBILE_DIR="$REPO_ROOT"
 IOS_DIR="$REPO_ROOT/ios"
+MOBILE_DIR="$REPO_ROOT"
 PODS_SUPPORT="$IOS_DIR/Pods/Target Support Files/Pods-AltonMobile"
 DEBUG_XCCONFIG="$PODS_SUPPORT/Pods-AltonMobile.debug.xcconfig"
 RELEASE_XCCONFIG="$PODS_SUPPORT/Pods-AltonMobile.release.xcconfig"
-DEBUG_FRAMEWORKS_LIST="$PODS_SUPPORT/Pods-AltonMobile-frameworks-Debug-input-files.xcfilelist"
 
 pods_look_complete() {
-  [ -f "$DEBUG_XCCONFIG" ] && [ -f "$RELEASE_XCCONFIG" ] && [ -f "$DEBUG_FRAMEWORKS_LIST" ]
+  [ -f "$DEBUG_XCCONFIG" ] && [ -f "$RELEASE_XCCONFIG" ]
 }
 
 if pods_look_complete; then
-  echo "==> ci_pre_xcodebuild: Pods OK (debug+release + xcfilelists)"
+  echo "==> ci_pre_xcodebuild: Pods OK"
   exit 0
 fi
 
-echo "==> ci_pre_xcodebuild: Pods incomplete or missing, running install..."
+echo "==> ci_pre_xcodebuild: Pods incomplete, reinstalling..."
 
 if [ ! -f "$IOS_DIR/Podfile" ]; then
   echo "error: Podfile not found at $IOS_DIR/Podfile" >&2
   exit 1
 fi
 
+cd "$MOBILE_DIR"
 if ! command -v node >/dev/null 2>&1; then
   brew install node
 fi
-if ! command -v bundle >/dev/null 2>&1; then
-  gem install bundler --no-document 2>/dev/null || gem install bundler --user-install --no-document
-  export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
+if ! command -v yarn >/dev/null 2>&1; then
+  npm install -g yarn
+fi
+yarn install --network-timeout 600000
+
+if ! command -v pod >/dev/null 2>&1; then
+  brew install cocoapods
 fi
 
-cd "$MOBILE_DIR"
-npm ci
 cd "$IOS_DIR"
-bundle install
-if ! bundle exec pod install; then
-  bundle exec pod install --verbose
-fi
+echo "export NODE_BINARY=$(command -v node)" >.xcode.env.local
+pod install --repo-update
 
 if ! pods_look_complete; then
   echo "error: pod install failed — Pods still incomplete" >&2
