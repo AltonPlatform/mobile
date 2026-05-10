@@ -77,13 +77,56 @@ ensure_node() {
   if command -v node >/dev/null 2>&1; then
     return 0
   fi
+  # На Xcode Cloud brew часто есть, но install падает (права/сеть) — без fallback скрипт выходил с 1 и не доходил до tar.gz.
   if command -v brew >/dev/null 2>&1; then
-    echo "==> Устанавливаем Node.js через Homebrew..."
-    brew install node
+    echo "==> Пробуем установить Node.js через Homebrew..."
+    if brew install node; then
+      hash -r
+      return 0
+    fi
+    echo "warn: brew install node не удался — ставим официальный бинарник с nodejs.org" >&2
+  fi
+  install_node_from_nodejs_org
+}
+
+# Gemfile.lock задаёт BUNDLED WITH. Bundler 4.x требует Ruby >= 3.2; на Xcode Cloud часто системный Ruby 2.6.
+ensure_bundler_from_lock() {
+  local lockfile="$1"
+  if [[ ! -f "$lockfile" ]]; then
+    echo "error: Gemfile.lock не найден: $lockfile" >&2
+    exit 1
+  fi
+  local ver
+  ver="$(awk '/^BUNDLED WITH$/{getline; gsub(/^[[:space:]]+/,""); print; exit}' "$lockfile")"
+  if [[ -z "${ver:-}" ]]; then
+    echo "==> В Gemfile.lock нет BUNDLED WITH — ставим bundler по умолчанию"
+    gem install bundler --no-document 2>/dev/null || gem install bundler --user-install --no-document
+    export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
     hash -r
     return 0
   fi
-  install_node_from_nodejs_org
+
+  if ruby -e 'exit Gem::Version.new(ARGV[0]) >= Gem::Version.new("4.0.0")' "$ver" 2>/dev/null; then
+    if ! ruby -e 'exit Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2.0")' 2>/dev/null; then
+      echo "warn: Bundler ${ver} требует Ruby >= 3.2, сейчас $(ruby -e 'print RUBY_VERSION')" >&2
+      if command -v brew >/dev/null 2>&1; then
+        echo "==> brew install ruby (нужно для Bundler 4.x)"
+        brew install ruby
+        export PATH="$(brew --prefix ruby)/bin:$PATH"
+        hash -r
+      fi
+    fi
+    if ! ruby -e 'exit Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2.0")' 2>/dev/null; then
+      echo "error: Bundler ${ver} требует Ruby >= 3.2; на CI: brew install ruby, или понизьте BUNDLED WITH (bundle update --bundler с Bundler 2.x)" >&2
+      exit 1
+    fi
+  fi
+
+  echo "==> Устанавливаем Bundler ${ver} (секция BUNDLED WITH в Gemfile.lock)"
+  gem install "bundler:${ver}" --no-document 2>/dev/null || gem install "bundler:${ver}" --user-install --no-document
+
+  export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
+  hash -r
 }
 
 ensure_node
@@ -101,21 +144,20 @@ fi
 echo "==> npm ci в $MOBILE_DIR"
 npm ci --no-audit --no-fund
 
-if ! command -v bundle >/dev/null 2>&1; then
-  echo "==> Устанавливаем Bundler..."
-  gem install bundler --no-document 2>/dev/null || gem install bundler --user-install --no-document
-  export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
-fi
+cd "$IOS_DIR"
+ensure_bundler_from_lock "$IOS_DIR/Gemfile.lock"
 bundle --version
 
-cd "$IOS_DIR"
 echo "==> bundle install в $IOS_DIR"
 bundle install
 
 echo "==> pod install в $IOS_DIR"
 if ! bundle exec pod install; then
   echo "==> pod install завершился с ошибкой, повтор с --verbose"
-  bundle exec pod install --verbose
+  if ! bundle exec pod install --verbose; then
+    echo "error: bundle exec pod install завершился неудачно дважды" >&2
+    exit 1
+  fi
 fi
 
 NODE_BIN="$(command -v node)"
@@ -125,15 +167,14 @@ echo "==> записан .xcode.env.local с NODE_BINARY=$NODE_BIN"
 PODS_SUPPORT="$IOS_DIR/Pods/Target Support Files/Pods-AltonMobile"
 RELEASE_XCCONFIG="$PODS_SUPPORT/Pods-AltonMobile.release.xcconfig"
 DEBUG_XCCONFIG="$PODS_SUPPORT/Pods-AltonMobile.debug.xcconfig"
-RES_RELEASE_IN="$PODS_SUPPORT/Pods-AltonMobile-resources-Release-input-files.xcfilelist"
-FW_RELEASE_OUT="$PODS_SUPPORT/Pods-AltonMobile-frameworks-Release-output-files.xcfilelist"
 
-for f in "$RELEASE_XCCONFIG" "$DEBUG_XCCONFIG" "$RES_RELEASE_IN" "$FW_RELEASE_OUT"; do
+# Обязательны только xcconfig — Xcode линкует их к таргету. Имена *.xcfilelist менялись между версиями CocoaPods.
+for f in "$RELEASE_XCCONFIG" "$DEBUG_XCCONFIG"; do
   if [[ ! -f "$f" ]]; then
-    echo "error: после pod install отсутствует ожидаемый файл CocoaPods: $f" >&2
+    echo "error: после pod install нет Pods-AltonMobile *.xcconfig: $f" >&2
     ls -la "$PODS_SUPPORT" 2>&1 || ls -la "$IOS_DIR/Pods" 2>&1 || true
     exit 1
   fi
 done
 
-echo "==> ci_post_clone OK (Pods-AltonMobile xcconfig + Release xcfilelists на месте)"
+echo "==> ci_post_clone OK (Pods-AltonMobile Debug/Release xcconfig на месте)"

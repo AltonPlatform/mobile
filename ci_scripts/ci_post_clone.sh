@@ -54,12 +54,53 @@ ensure_node() {
     return 0
   fi
   if command -v brew >/dev/null 2>&1; then
-    echo "==> Installing Node.js via Homebrew..."
-    brew install node
+    echo "==> Trying Node.js via Homebrew..."
+    if brew install node; then
+      hash -r
+      return 0
+    fi
+    echo "warn: brew install node failed; using official nodejs.org tarball" >&2
+  fi
+  install_node_from_nodejs_org
+}
+
+ensure_bundler_from_lock() {
+  local lockfile="$1"
+  if [[ ! -f "$lockfile" ]]; then
+    echo "error: Gemfile.lock not found: $lockfile" >&2
+    exit 1
+  fi
+  local ver
+  ver="$(awk '/^BUNDLED WITH$/{getline; gsub(/^[[:space:]]+/,""); print; exit}' "$lockfile")"
+  if [[ -z "${ver:-}" ]]; then
+    echo "==> No BUNDLED WITH in Gemfile.lock — installing default bundler"
+    gem install bundler --no-document 2>/dev/null || gem install bundler --user-install --no-document
+    export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
     hash -r
     return 0
   fi
-  install_node_from_nodejs_org
+
+  if ruby -e 'exit Gem::Version.new(ARGV[0]) >= Gem::Version.new("4.0.0")' "$ver" 2>/dev/null; then
+    if ! ruby -e 'exit Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2.0")' 2>/dev/null; then
+      echo "warn: Bundler ${ver} needs Ruby >= 3.2, have $(ruby -e 'print RUBY_VERSION')" >&2
+      if command -v brew >/dev/null 2>&1; then
+        echo "==> brew install ruby (required for Bundler 4.x)"
+        brew install ruby
+        export PATH="$(brew --prefix ruby)/bin:$PATH"
+        hash -r
+      fi
+    fi
+    if ! ruby -e 'exit Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2.0")' 2>/dev/null; then
+      echo "error: Bundler ${ver} requires Ruby >= 3.2 (try: brew install ruby)" >&2
+      exit 1
+    fi
+  fi
+
+  echo "==> Installing Bundler ${ver} (BUNDLED WITH)"
+  gem install "bundler:${ver}" --no-document 2>/dev/null || gem install "bundler:${ver}" --user-install --no-document
+
+  export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
+  hash -r
 }
 
 ensure_node
@@ -77,20 +118,19 @@ fi
 echo "==> npm ci in $MOBILE_DIR"
 npm ci --no-audit --no-fund
 
-if ! command -v bundle >/dev/null 2>&1; then
-  echo "==> Installing Bundler..."
-  gem install bundler --no-document 2>/dev/null || gem install bundler --user-install --no-document
-  export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
-fi
+cd "$IOS_DIR"
+ensure_bundler_from_lock "$IOS_DIR/Gemfile.lock"
 bundle --version
 
-cd "$IOS_DIR"
 echo "==> bundle install in $IOS_DIR"
 bundle install
 echo "==> pod install in $IOS_DIR"
 if ! bundle exec pod install; then
   echo "==> pod install failed, retry with --verbose"
-  bundle exec pod install --verbose
+  if ! bundle exec pod install --verbose; then
+    echo "error: bundle exec pod install failed twice" >&2
+    exit 1
+  fi
 fi
 
 if [ ! -f "$DEBUG_XCCONFIG" ] || [ ! -f "$RELEASE_XCCONFIG" ]; then
