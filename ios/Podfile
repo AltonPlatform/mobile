@@ -45,26 +45,30 @@ target 'AltonMobile' do
       # :ccache_enabled => true
     )
 
-    # Xcode / Swift: статические Swift-поды (Lottie, SwiftUI и др.) тянут compatibility-символы;
-    # без weak-link линковка archive на CI падает на __swift_FORCE_LOAD_$_swiftCompatibility*.
-    swift_compat = %w[
-      -Wl,-weak-lswiftCompatibilityConcurrency
-      -Wl,-weak-lswiftCompatibility56
-      -Wl,-weak-lswiftCompatibility51
-    ]
+    # Swift static pods: даём линкеру искать runtime/compatibility в toolchain (без -weak-l*, на CI часто
+    # «Library swiftCompatibility… not found»). Удаляем возможные старые weak-l флаги с прошлых pod install.
     app_project_path = File.expand_path('AltonMobile.xcodeproj', __dir__)
     if File.directory?(app_project_path)
       xcodeproj = Xcodeproj::Project.open(app_project_path)
+      swift_paths = [
+        '"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)"',
+        '"$(SDKROOT)/usr/lib/swift"'
+      ]
       xcodeproj.targets.each do |native_target|
         next unless native_target.name == 'AltonMobile'
 
         native_target.build_configurations.each do |bc|
+          paths = bc.build_settings['LIBRARY_SEARCH_PATHS']
+          paths = paths.is_a?(Array) ? paths : [paths].compact
+          paths.unshift('$(inherited)') unless paths.include?('$(inherited)')
+          swift_paths.each do |p|
+            paths << p unless paths.include?(p)
+          end
+          bc.build_settings['LIBRARY_SEARCH_PATHS'] = paths.uniq
+
           flags = bc.build_settings['OTHER_LDFLAGS']
           flags = flags.is_a?(Array) ? flags : [flags].compact
-          flags.unshift('$(inherited)') unless flags.include?('$(inherited)')
-          swift_compat.each do |f|
-            flags << f unless flags.include?(f)
-          end
+          flags.reject! { |f| f.to_s.include?('swiftCompatibility') }
           bc.build_settings['OTHER_LDFLAGS'] = flags
         end
       end
