@@ -44,5 +44,31 @@ target 'AltonMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Xcode / Swift: статические Swift-поды (Lottie, SwiftUI и др.) тянут compatibility-символы;
+    # без weak-link линковка archive на CI падает на __swift_FORCE_LOAD_$_swiftCompatibility*.
+    swift_compat = %w[
+      -Wl,-weak-lswiftCompatibilityConcurrency
+      -Wl,-weak-lswiftCompatibility56
+      -Wl,-weak-lswiftCompatibility51
+    ]
+    app_project_path = File.expand_path('AltonMobile.xcodeproj', __dir__)
+    if File.directory?(app_project_path)
+      xcodeproj = Xcodeproj::Project.open(app_project_path)
+      xcodeproj.targets.each do |native_target|
+        next unless native_target.name == 'AltonMobile'
+
+        native_target.build_configurations.each do |bc|
+          flags = bc.build_settings['OTHER_LDFLAGS']
+          flags = flags.is_a?(Array) ? flags : [flags].compact
+          flags.unshift('$(inherited)') unless flags.include?('$(inherited)')
+          swift_compat.each do |f|
+            flags << f unless flags.include?(f)
+          end
+          bc.build_settings['OTHER_LDFLAGS'] = flags
+        end
+      end
+      xcodeproj.save
+    end
   end
 end

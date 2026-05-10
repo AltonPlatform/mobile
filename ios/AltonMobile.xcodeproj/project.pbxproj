@@ -520,6 +520,9 @@
 					"$(inherited)",
 					"-ObjC",
 					"-lc++",
+					"-Wl,-weak-lswiftCompatibilityConcurrency",
+					"-Wl,-weak-lswiftCompatibility56",
+					"-Wl,-weak-lswiftCompatibility51",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.altonTrader;
 				PRODUCT_NAME = AltonMobile;
@@ -548,6 +551,9 @@
 					"$(inherited)",
 					"-ObjC",
 					"-lc++",
+					"-Wl,-weak-lswiftCompatibilityConcurrency",
+					"-Wl,-weak-lswiftCompatibility56",
+					"-Wl,-weak-lswiftCompatibility51",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.altonTrader;
 				PRODUCT_NAME = AltonMobile;
