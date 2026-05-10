@@ -1,5 +1,5 @@
 #!/bin/sh
-# Подстраховка: если Pods не собраны после post_clone — те же шаги, что в ci_post_clone.sh.
+# Рядом с workspace (ios/ci_scripts). Подстраховка, если Pods не собраны.
 set -e
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
@@ -8,7 +8,7 @@ export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 
 SCRIPT_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+REPO_ROOT="${CI_PRIMARY_REPOSITORY_PATH:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 IOS_DIR="$REPO_ROOT/ios"
 MOBILE_DIR="$REPO_ROOT"
 PODS_SUPPORT="$IOS_DIR/Pods/Target Support Files/Pods-AltonMobile"
