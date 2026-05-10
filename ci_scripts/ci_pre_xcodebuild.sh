@@ -46,7 +46,9 @@ fi
 
 cd "$IOS_DIR"
 echo "export NODE_BINARY=$(command -v node)" >.xcode.env.local
-pod install --repo-update
+if ! pod install; then
+  pod install --verbose
+fi
 
 if ! pods_look_complete; then
   echo "error: pod install failed — Pods still incomplete" >&2
