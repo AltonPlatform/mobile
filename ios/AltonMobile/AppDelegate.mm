@@ -1,4 +1,5 @@
 #import "AppDelegate.h"
+#import "AltonMobile-Swift.h"
 
 #import <React/RCTBundleURLProvider.h>
 #import <ReactAppDependencyProvider/RCTAppDependencyProvider.h>
@@ -7,6 +8,7 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+  [ATMSwiftRuntimeShim ping];
   self.moduleName = @"AltonMobile";
   self.initialProps = @{};
   self.dependencyProvider = [RCTAppDependencyProvider new];

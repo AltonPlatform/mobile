@@ -23,6 +23,7 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		C5C5A4DBFC294E0C81DD3E9A /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2C0F0686D9C64B54AABC67C8 /* Inter-SemiBold.ttf */; };
 		D4E5F6A01A68108700A75B9A /* TelegramLoginModule.m in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6A11A68108700A75B9A /* TelegramLoginModule.m */; };
+		E8D9C7B62F50202500A75B9B /* SwiftCompatibilityShim.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D9C7B52F50202500A75B9B /* SwiftCompatibilityShim.swift */; };
 		EDA7462DDAEC4BBA889A8AD4 /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 2C0F0686D9C64B54AABC67C8 /* Inter-SemiBold.ttf */; };
 /* End PBXBuildFile section */
 
@@ -58,6 +59,7 @@
 		89C6BE57DB24E9ADA2F236DE /* Pods-AltonMobile-AltonMobileTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AltonMobile-AltonMobileTests.release.xcconfig"; path = "Target Support Files/Pods-AltonMobile-AltonMobileTests/Pods-AltonMobile-AltonMobileTests.release.xcconfig"; sourceTree = "<group>"; };
 		ABE7135574774CE2B92E57AF /* Inter-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Bold.ttf"; path = "../assets/fonts/Inter-Bold.ttf"; sourceTree = "<group>"; };
 		D4E5F6A11A68108700A75B9A /* TelegramLoginModule.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = TelegramLoginModule.m; path = AltonMobile/TelegramLoginModule.m; sourceTree = "<group>"; };
+		E8D9C7B52F50202500A75B9B /* SwiftCompatibilityShim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SwiftCompatibilityShim.swift; path = AltonMobile/SwiftCompatibilityShim.swift; sourceTree = "<group>"; };
 		E8F318DB295A4DA6869E4F89 /* Inter-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter-Medium.ttf"; path = "../assets/fonts/Inter-Medium.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -105,6 +107,7 @@
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
 				D4E5F6A11A68108700A75B9A /* TelegramLoginModule.m */,
+				E8D9C7B52F50202500A75B9B /* SwiftCompatibilityShim.swift */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -434,6 +437,7 @@
 			files = (
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
 				D4E5F6A01A68108700A75B9A /* TelegramLoginModule.m in Sources */,
+				E8D9C7B62F50202500A75B9B /* SwiftCompatibilityShim.swift in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
