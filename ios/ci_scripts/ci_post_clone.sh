@@ -47,18 +47,8 @@ echo "export NODE_BINARY=$(command -v node)" >.xcode.env.local
 echo "==> bundle install (ios/Gemfile.lock)"
 bundle install
 
-echo "==> bundle exec pod install"
 bundle exec pod --version
-ok=0
-if bundle exec pod install; then
-  ok=1
-else
-  echo "warn: bundle exec pod install failed, retry --verbose" >&2
-  bundle exec pod install --verbose && ok=1
-fi
-if [ "$ok" != 1 ]; then
-  exit 1
-fi
+ios_bundle_pod_install "$IOS_DIR"
 
 if [ ! -f "$PODS_SUPPORT/Pods-AltonMobile.release.xcconfig" ]; then
   echo "error: нет Pods-AltonMobile.release.xcconfig" >&2

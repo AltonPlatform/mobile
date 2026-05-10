@@ -119,3 +119,29 @@ ensure_ruby_bundler_for_ios() {
     exit 1
   }
 }
+
+# Снимок Podfile.lock иногда рассинхронен с «текущим» react-native (yarn дал 0.85.3, lock — 0.85.2).
+# Сначала чистый install; при конфликте prebuilt — pod update --no-repo-update (без CDN repo-update).
+ios_bundle_pod_install() {
+  IOS_DIR="$1"
+  cd "$IOS_DIR" || exit 1
+
+  echo "==> rm -rf Pods"
+  rm -rf Pods
+
+  echo "==> bundle exec pod install"
+  if bundle exec pod install; then
+    return 0
+  fi
+
+  echo "warn: pod install failed → bundle exec pod update --no-repo-update (синхронизация lock с node_modules)" >&2
+  bundle exec pod update --no-repo-update
+
+  echo "==> bundle exec pod install (after pod update)"
+  if bundle exec pod install; then
+    return 0
+  fi
+
+  echo "warn: повтор pod install --verbose" >&2
+  bundle exec pod install --verbose
+}

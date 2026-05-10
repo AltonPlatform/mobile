@@ -45,15 +45,7 @@ ensure_ruby_bundler_for_ios "$IOS_DIR"
 cd "$IOS_DIR"
 echo "export NODE_BINARY=$(command -v node)" >.xcode.env.local
 bundle install
-ok=0
-if bundle exec pod install; then
-  ok=1
-else
-  bundle exec pod install --verbose && ok=1
-fi
-if [ "$ok" != 1 ]; then
-  exit 1
-fi
+ios_bundle_pod_install "$IOS_DIR"
 
 if ! pods_look_complete; then
   echo "error: Pods incomplete" >&2
