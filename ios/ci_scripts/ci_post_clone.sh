@@ -1,5 +1,6 @@
 #!/bin/sh
 # Xcode Cloud: ios/ci_scripts рядом с AltonMobile.xcworkspace.
+# Podfile: используйте «bundle exec pod install» (не отдельный «pod» из Homebrew).
 set -e
 
 case "${CI_DEBUG_POST_CLONE:-}" in 1|true|yes) set -x ;; esac
@@ -8,6 +9,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export HOMEBREW_NO_ANALYTICS=1
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 export COCOAPODS_DISABLE_STATS=true
+export GIT_TERMINAL_PROMPT=0
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export NPM_CONFIG_FETCH_TIMEOUT="${NPM_CONFIG_FETCH_TIMEOUT:-600000}"
@@ -37,19 +39,22 @@ if [ ! -f "$REPO_ROOT/node_modules/react-native/package.json" ]; then
   exit 1
 fi
 
-ensure_pod
-pod --version
+ensure_ruby_bundler_for_ios "$IOS_DIR"
 
 cd "$IOS_DIR"
 echo "export NODE_BINARY=$(command -v node)" >.xcode.env.local
 
-echo "==> pod install"
+echo "==> bundle install (ios/Gemfile.lock)"
+bundle install
+
+echo "==> bundle exec pod install"
+bundle exec pod --version
 ok=0
-if pod install; then
+if bundle exec pod install; then
   ok=1
 else
-  echo "warn: pod install failed, retry verbose" >&2
-  pod install --verbose && ok=1
+  echo "warn: bundle exec pod install failed, retry --verbose" >&2
+  bundle exec pod install --verbose && ok=1
 fi
 if [ "$ok" != 1 ]; then
   exit 1

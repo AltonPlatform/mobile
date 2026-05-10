@@ -1,4 +1,5 @@
 # Общие функции для ci_post_clone.sh и ci_pre_xcodebuild.sh (POSIX sh).
+# CocoaPods: только через Bundler (как в ios/Podfile — bundle exec pod install).
 # shellcheck shell=sh
 
 ensure_brew_in_path() {
@@ -74,22 +75,47 @@ ensure_yarn() {
     hash -r
   fi
   command -v yarn >/dev/null 2>&1 || {
-    echo "error: yarn install failed (corepack/npm)" >&2
+    echo "error: yarn failed (corepack/npm)" >&2
     exit 1
   }
 }
 
-ensure_pod() {
-  if command -v pod >/dev/null 2>&1; then
-    return 0
+install_bundler_from_lock() {
+  lock="$1"
+  if [ ! -f "$lock" ]; then
+    echo "error: Gemfile.lock not found: $lock" >&2
+    exit 1
   fi
-  ensure_brew_in_path || install_homebrew || true
-  if command -v brew >/dev/null 2>&1 && brew install cocoapods; then
-    hash -r
-    return 0
+  ver="$(awk '/^BUNDLED WITH$/{getline;gsub(/^[[:space:]]+/,"");print;exit}' "$lock")"
+  if [ -n "$ver" ]; then
+    echo "==> gem install bundler:$ver (BUNDLED WITH)"
+    gem install "bundler:$ver" --no-document 2>/dev/null || gem install "bundler:$ver" --user-install --no-document
+  else
+    gem install bundler --no-document 2>/dev/null || gem install bundler --user-install --no-document
   fi
-  echo "==> CocoaPods via gem --user-install"
-  gem install cocoapods --user-install --no-document
   export PATH="$(ruby -e 'puts Gem.bindir'):$(ruby -e 'puts File.join(Gem.user_dir, "bin")'):$PATH"
   hash -r
+}
+
+# Bundler 4.x из Gemfile.lock требует Ruby >= 3.2 — без brew ruby на старом macOS нельзя.
+ensure_ruby_bundler_for_ios() {
+  IOS_DIR="$1"
+  ensure_brew_in_path || install_homebrew || true
+  if ! ruby -e 'exit Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2.0")' 2>/dev/null; then
+    if command -v brew >/dev/null 2>&1; then
+      echo "==> brew install ruby (нужен Ruby >= 3.2 для Bundler / Gemfile.lock)"
+      brew install ruby
+      export PATH="$(brew --prefix ruby)/bin:$PATH"
+      hash -r
+    fi
+  fi
+  if ! ruby -e 'exit Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2.0")' 2>/dev/null; then
+    echo "error: нужен Ruby >= 3.2 (brew install ruby)" >&2
+    exit 1
+  fi
+  install_bundler_from_lock "$IOS_DIR/Gemfile.lock"
+  command -v bundle >/dev/null 2>&1 || {
+    echo "error: bundle не найден после установки bundler" >&2
+    exit 1
+  }
 }
