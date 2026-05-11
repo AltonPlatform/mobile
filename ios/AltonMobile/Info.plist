@@ -20,8 +20,30 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>trade.altons.tonconnect</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>alton</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tonkeeper-tc</string>
+		<string>tonkeeper-pro-tc</string>
+		<string>tc</string>
+		<string>mytonwallet-tc</string>
+		<string>tonhub</string>
+		<string>safepal-tc</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -33,6 +55,8 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Alton Trader needs access to your photo library when you choose to attach or upload an image (for example, a profile picture or documents you explicitly select).</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>
@@ -48,33 +72,17 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>UIStatusBarHidden</key>
+	<false/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLName</key>
-			<string>trade.altons.tonconnect</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>alton</string>
-			</array>
-		</dict>
-	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>tonkeeper-tc</string>
-		<string>tonkeeper-pro-tc</string>
-		<string>tc</string>
-		<string>mytonwallet-tc</string>
-		<string>tonhub</string>
-		<string>safepal-tc</string>
+		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
