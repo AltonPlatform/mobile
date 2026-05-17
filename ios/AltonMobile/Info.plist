@@ -37,6 +37,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
+		<string>tg</string>
+		<string>telegram</string>
 		<string>tonkeeper-tc</string>
 		<string>tonkeeper-pro-tc</string>
 		<string>tc</string>

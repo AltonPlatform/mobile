@@ -8,12 +8,22 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Platform,
+  Linking,
 } from 'react-native';
 import WebView, {
   type WebViewNavigation,
+  type WebViewOpenWindowEvent,
 } from 'react-native-webview';
+import {useTranslation} from 'react-i18next';
 
-import {colors} from '../theme/tokens';
+import {colors, space} from '../theme/tokens';
+import {
+  canOpenTelegramApp,
+  extractOAuthCode,
+  isNativeTelegramAuthCallback,
+  isTelegramAppLink,
+  isTelegramOAuthCallbackUrl,
+} from '../utils/telegramAuthLinks';
 
 interface Props {
   visible: boolean;
@@ -23,22 +33,6 @@ interface Props {
   onCancel: () => void;
 }
 
-/** Same OAuth redirect target despite trailing slashes / query-only differences. */
-function isOAuthRedirectTo(navUrl: string, redirectUriTemplate: string): boolean {
-  try {
-    const nav = new URL(navUrl);
-    const tmpl = new URL(redirectUriTemplate);
-    const norm = (p: string) =>
-      (p.endsWith('/') ? p.slice(0, -1) : p) || '/';
-    return (
-      nav.origin === tmpl.origin &&
-      norm(nav.pathname) === norm(tmpl.pathname)
-    );
-  } catch {
-    return navUrl.startsWith(redirectUriTemplate);
-  }
-}
-
 export function TelegramAuthModal({
   visible,
   authUrl,
@@ -46,58 +40,135 @@ export function TelegramAuthModal({
   onCode,
   onCancel,
 }: Props) {
+  const {t} = useTranslation();
   const [loading, setLoading] = useState(true);
-  /** Hides WebView the same frame we got the code so the user is not left on Telegram/callback. */
   const [webviewDismissed, setWebviewDismissed] = useState(false);
+  const [noTelegramAppBanner, setNoTelegramAppBanner] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const codeExtracted = useRef(false);
 
   useEffect(() => {
-    if (visible) {
-      setWebviewDismissed(false);
-      codeExtracted.current = false;
-      setLoading(true);
+    if (!visible) {
+      setNoTelegramAppBanner(false);
+      return;
     }
+    setWebviewDismissed(false);
+    codeExtracted.current = false;
+    setLoading(true);
+
+    void canOpenTelegramApp().then(can => {
+      if (!can) {
+        setNoTelegramAppBanner(true);
+      }
+    });
   }, [visible, authUrl]);
+
+  const finishWithCode = useCallback(
+    (code: string) => {
+      if (codeExtracted.current) return;
+      codeExtracted.current = true;
+      webViewRef.current?.stopLoading();
+      setWebviewDismissed(true);
+      setLoading(false);
+      onCode(code);
+    },
+    [onCode],
+  );
+
+  const tryExtractCodeFromUrl = useCallback(
+    (url: string): boolean => {
+      if (codeExtracted.current) return true;
+
+      if (
+        isTelegramOAuthCallbackUrl(url, redirectUri) ||
+        isNativeTelegramAuthCallback(url)
+      ) {
+        const code = extractOAuthCode(url);
+        if (code) {
+          finishWithCode(code);
+          return true;
+        }
+        try {
+          const error = new URL(url).searchParams.get('error');
+          if (error) {
+            codeExtracted.current = true;
+            console.warn('Telegram auth error:', error);
+            onCancel();
+            return true;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      return false;
+    },
+    [redirectUri, finishWithCode, onCancel],
+  );
+
+  const tryOpenTelegramApp = useCallback(async (url: string) => {
+    const can = await canOpenTelegramApp();
+    if (!can) {
+      setNoTelegramAppBanner(true);
+      return;
+    }
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setNoTelegramAppBanner(true);
+    }
+  }, []);
 
   const handleNavigationChange = useCallback(
     (event: WebViewNavigation) => {
       if (codeExtracted.current) return;
 
       const url = event.url;
-      if (!isOAuthRedirectTo(url, redirectUri)) return;
-
-      codeExtracted.current = true;
-      webViewRef.current?.stopLoading();
-
-      try {
-        const parsed = new URL(url);
-        const code = parsed.searchParams.get('code');
-        if (code) {
-          setWebviewDismissed(true);
-          setLoading(false);
-          onCode(code);
-        } else {
-          const error = parsed.searchParams.get('error') || 'no_code';
-          onCancel();
-          console.warn('Telegram auth error:', error);
-        }
-      } catch {
-        onCancel();
+      if (isTelegramAppLink(url)) {
+        void tryOpenTelegramApp(url);
+        return;
       }
+      tryExtractCodeFromUrl(url);
     },
-    [redirectUri, onCode, onCancel],
+    [tryOpenTelegramApp, tryExtractCodeFromUrl],
   );
 
   const handleShouldStartLoad = useCallback(
     (event: {url: string}) => {
-      if (isOAuthRedirectTo(event.url, redirectUri)) {
-        handleNavigationChange(event as WebViewNavigation);
+      const {url} = event;
+
+      if (isTelegramAppLink(url)) {
+        void tryOpenTelegramApp(url);
         return false;
       }
+
+      if (tryExtractCodeFromUrl(url)) {
+        return false;
+      }
+
       return true;
     },
-    [redirectUri, handleNavigationChange],
+    [tryOpenTelegramApp, tryExtractCodeFromUrl],
+  );
+
+  const handleOpenWindow = useCallback(
+    (event: WebViewOpenWindowEvent) => {
+      const targetUrl = event.nativeEvent.targetUrl;
+      if (!targetUrl) return;
+
+      if (isTelegramAppLink(targetUrl)) {
+        void tryOpenTelegramApp(targetUrl);
+        return;
+      }
+
+      if (tryExtractCodeFromUrl(targetUrl)) {
+        return;
+      }
+
+      webViewRef.current?.injectJavaScript(
+        `window.location.href = ${JSON.stringify(targetUrl)}; true;`,
+      );
+    },
+    [tryOpenTelegramApp, tryExtractCodeFromUrl],
   );
 
   const handleLoadEnd = useCallback(() => setLoading(false), []);
@@ -105,6 +176,7 @@ export function TelegramAuthModal({
   const handleModalHide = useCallback(() => {
     codeExtracted.current = false;
     setWebviewDismissed(false);
+    setNoTelegramAppBanner(false);
     setLoading(true);
   }, []);
 
@@ -120,9 +192,28 @@ export function TelegramAuthModal({
           <TouchableOpacity onPress={onCancel} style={styles.closeBtn}>
             <Text style={styles.closeText}>✕</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Telegram Login</Text>
+          <Text style={styles.title}>{t('Sign in with Telegram')}</Text>
           <View style={styles.placeholder} />
         </View>
+
+        {noTelegramAppBanner && visible && !webviewDismissed ? (
+          <View style={styles.banner}>
+            <Text style={styles.bannerTitle}>
+              {t('telegram_auth_app_not_installed')}
+            </Text>
+            <Text style={styles.bannerHint}>
+              {t('telegram_auth_phone_login_hint')}
+            </Text>
+            <TouchableOpacity
+              style={styles.bannerDismiss}
+              onPress={() => setNoTelegramAppBanner(false)}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <Text style={styles.bannerDismissText}>
+                {t('telegram_auth_banner_dismiss')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {visible && authUrl && !webviewDismissed ? (
           <WebView
@@ -131,6 +222,8 @@ export function TelegramAuthModal({
             style={styles.webview}
             onNavigationStateChange={handleNavigationChange}
             onShouldStartLoadWithRequest={handleShouldStartLoad}
+            onOpenWindow={handleOpenWindow}
+            setSupportMultipleWindows={Platform.OS === 'android'}
             onLoadEnd={handleLoadEnd}
             startInLoadingState
             javaScriptEnabled
@@ -148,7 +241,7 @@ export function TelegramAuthModal({
         {webviewDismissed && visible ? (
           <View style={styles.loader}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.signingIn}>Signing in…</Text>
+            <Text style={styles.signingIn}>{t('Login')}…</Text>
           </View>
         ) : null}
 
@@ -182,6 +275,34 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   placeholder: {width: 40},
+  banner: {
+    backgroundColor: colors.surfaceMuted,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  bannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  bannerHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
+  },
+  bannerDismiss: {
+    alignSelf: 'flex-start',
+    marginTop: space.sm,
+    paddingVertical: 4,
+  },
+  bannerDismissText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
   webview: {flex: 1, backgroundColor: colors.bg},
   loader: {
     ...StyleSheet.absoluteFillObject,

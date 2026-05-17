@@ -1,7 +1,12 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useCallback, useRef} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../config';
 import type {TicketTier} from '../api/miningClick';
+
+export type SessionTimeMeta = {
+  timeLeftMs: number;
+  gameEndsAt: number;
+};
 
 export type ClickResultMessage = {
   type: 'click_result';
@@ -11,12 +16,12 @@ export type ClickResultMessage = {
   combo: number;
   clicks: number;
   hashrate: number;
-};
+} & SessionTimeMeta;
 
 export type MistakePendingMessage = {
   type: 'mistake_pending';
   livesRemaining: number;
-};
+} & SessionTimeMeta;
 
 export type MistakeResolvedMessage = {
   type: 'mistake_resolved';
@@ -24,13 +29,14 @@ export type MistakeResolvedMessage = {
   livesRemaining: number;
   combo: number;
   hashrate: number;
-};
+} & SessionTimeMeta;
 
 export type SessionStartedMessage = {
   type: 'session_started';
   sessionId: string;
   livesRemaining: number;
   startsAt: number;
+  gameEndsAt: number;
   activeBlock: number;
   wsPath: string;
 };
@@ -47,6 +53,8 @@ type ServerMessage = {
   combo?: number;
   hashrate?: number;
   timeLeft?: number;
+  timeLeftMs?: number;
+  gameEndsAt?: number;
   status?: string;
   wsPath?: string;
   nextBlock?: number;
@@ -77,6 +85,7 @@ export function useMiningSocket() {
   const pendingRef = useRef<Map<string, Pending>>(new Map());
   const clickQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const sessionIdRef = useRef<string | null>(null);
+  const intentionalCloseRef = useRef(false);
   const openReadyRef = useRef<{
     resolve: (ws: WebSocket) => void;
     reject: (err: Error) => void;
@@ -151,7 +160,10 @@ export function useMiningSocket() {
       }
 
       if (msg.type === 'error') {
-        const err = new Error(msg.message || msg.code || 'error');
+        const err = new Error(msg.message || msg.code || 'error') as Error & {
+          code?: string;
+        };
+        err.code = msg.code;
         if (pendingRef.current.has('start')) {
           settlePending('start', undefined, err);
         }
@@ -163,20 +175,51 @@ export function useMiningSocket() {
     [settlePending],
   );
 
+  const rejectAllPending = useCallback(
+    (message: string) => {
+      pendingRef.current.forEach((_, key) => {
+        settlePending(key, undefined, new Error(message));
+      });
+      openReadyRef.current?.reject(new Error(message));
+      openReadyRef.current = null;
+    },
+    [settlePending],
+  );
+
+  /** Жёсткое отключение: отклоняет ожидающие запросы (новая игра, сброс) */
   const disconnect = useCallback(() => {
-    pendingRef.current.forEach((_, key) => {
-      settlePending(key, undefined, new Error('WebSocket disconnected'));
+    rejectAllPending('WebSocket disconnected');
+    intentionalCloseRef.current = true;
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    } else {
+      intentionalCloseRef.current = false;
+    }
+    sessionIdRef.current = null;
+  }, [rejectAllPending]);
+
+  /** Мягкое закрытие после успешного end — без ошибок в UI */
+  const closeConnection = useCallback(() => {
+    intentionalCloseRef.current = true;
+    pendingRef.current.forEach((p, key) => {
+      clearTimeout(p.timer);
+      pendingRef.current.delete(key);
     });
-    openReadyRef.current?.reject(new Error('WebSocket disconnected'));
     openReadyRef.current = null;
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
+    } else {
+      intentionalCloseRef.current = false;
     }
     sessionIdRef.current = null;
-  }, [settlePending]);
+  }, []);
 
-  useEffect(() => () => disconnect(), [disconnect]);
+  const drainQueue = useCallback(
+    () => clickQueueRef.current as Promise<unknown>,
+    [],
+  );
 
   const openSocket = useCallback(
     async (wsPath: string, resumeSessionId?: string): Promise<WebSocket> => {
@@ -224,10 +267,15 @@ export function useMiningSocket() {
 
         ws.onclose = () => {
           wsRef.current = null;
+          const intentional = intentionalCloseRef.current;
+          intentionalCloseRef.current = false;
+          if (!intentional) {
+            rejectAllPending('WebSocket connection lost');
+          }
         };
       });
     },
-    [disconnect, handleServerMessage],
+    [disconnect, handleServerMessage, rejectAllPending],
   );
 
   const startSession = useCallback(
@@ -311,6 +359,8 @@ export function useMiningSocket() {
 
   return {
     disconnect,
+    closeConnection,
+    drainQueue,
     startSession,
     sendClick,
     resolveMistake,

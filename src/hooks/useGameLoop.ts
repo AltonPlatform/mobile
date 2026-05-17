@@ -1,32 +1,33 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {calcHashrate} from '../utils/miningHashrate';
-
-const GAME_MS = 30_000;
-import {REWARD_COEF} from '../utils/miningHashrate';
-
-const REWARD_RATE = REWARD_COEF;
+import {
+  calcHashrate,
+  currentReward,
+  GAME_DURATION_MS,
+} from '../utils/miningHashrate';
 const SAMPLE_INTERVAL_MS = 100;
 
 export type HashSample = {t: number; hashrate: number};
 
 type Options = {
   running: boolean;
-  paused: boolean;
-  startsAt: number | null;
+  /** Абсолютный дедлайн с бэкенда (startedAt + 30s), wall-clock */
+  gameEndsAt: number | null;
   stake: number;
   clicks: number;
+  /** После ошибки монеты не копятся (как на сервере) */
+  accrueReward: boolean;
   onTimeout: () => void;
 };
 
 export function useGameLoop({
   running,
-  paused,
-  startsAt,
+  gameEndsAt,
   stake,
   clicks,
+  accrueReward,
   onTimeout,
 }: Options) {
-  const [timeLeft, setTimeLeft] = useState(GAME_MS / 1000);
+  const [timeLeft, setTimeLeft] = useState(GAME_DURATION_MS / 1000);
   const [visualReward, setVisualReward] = useState(0);
   const [samples, setSamples] = useState<HashSample[]>([]);
   const [displayHashrate, setDisplayHashrate] = useState(0);
@@ -35,62 +36,67 @@ export function useGameLoop({
   const endedRef = useRef(false);
   const stakeRef = useRef(stake);
   const clicksRef = useRef(clicks);
-  const pausedRef = useRef(paused);
-  const pausedMsRef = useRef(0);
-  const pauseStartedAtRef = useRef<number | null>(null);
+  const gameEndsAtRef = useRef(gameEndsAt);
+  const accrueRewardRef = useRef(accrueReward);
   const lastSampleAtRef = useRef(0);
 
   onTimeoutRef.current = onTimeout;
   stakeRef.current = stake;
   clicksRef.current = clicks;
-  pausedRef.current = paused;
+  gameEndsAtRef.current = gameEndsAt;
+  accrueRewardRef.current = accrueReward;
 
   useEffect(() => {
-    if (paused && pauseStartedAtRef.current == null) {
-      pauseStartedAtRef.current = Date.now();
+    if (!accrueReward) {
+      setVisualReward(0);
     }
-    if (!paused && pauseStartedAtRef.current != null) {
-      pausedMsRef.current += Date.now() - pauseStartedAtRef.current;
-      pauseStartedAtRef.current = null;
-    }
-  }, [paused]);
+  }, [accrueReward]);
 
   useEffect(() => {
     setDisplayHashrate(calcHashrate(stake, clicks));
   }, [stake, clicks]);
 
-  const effectiveElapsed = useCallback(() => {
-    if (!startsAt) return 0;
-    let extra = pausedMsRef.current;
-    if (pauseStartedAtRef.current != null) {
-      extra += Date.now() - pauseStartedAtRef.current;
-    }
-    return Math.max(0, Date.now() - startsAt - extra);
-  }, [startsAt]);
+  const msLeft = useCallback(() => {
+    const ends = gameEndsAtRef.current;
+    if (!ends) return GAME_DURATION_MS;
+    return Math.max(0, ends - Date.now());
+  }, []);
+
+  const elapsedMs = useCallback(() => {
+    const ends = gameEndsAtRef.current;
+    if (!ends) return 0;
+    return Math.min(GAME_DURATION_MS, Math.max(0, GAME_DURATION_MS - msLeft()));
+  }, [msLeft]);
 
   useEffect(() => {
-    if (!running || !startsAt) {
+    if (!running || !gameEndsAt) {
       return;
     }
     endedRef.current = false;
     lastSampleAtRef.current = 0;
 
     let raf = 0;
-    let last = performance.now();
 
     const tick = (now: number) => {
-      const dt = Math.min(now - last, 100);
-      last = now;
-      const elapsed = effectiveElapsed();
-      const left = Math.max(0, GAME_MS - elapsed);
+      const left = msLeft();
       setTimeLeft(left / 1000);
 
-      if (!pausedRef.current && stakeRef.current > 0) {
+      if (stakeRef.current > 0) {
         const hr = calcHashrate(stakeRef.current, clicksRef.current);
         setDisplayHashrate(hr);
-        setVisualReward(r => r + hr * REWARD_RATE * (dt / 1000));
+        if (accrueRewardRef.current) {
+          const elapsedSec = elapsedMs() / 1000;
+          setVisualReward(
+            currentReward(
+              stakeRef.current,
+              clicksRef.current,
+              elapsedSec,
+            ),
+          );
+        }
         if (now - lastSampleAtRef.current >= SAMPLE_INTERVAL_MS) {
           lastSampleAtRef.current = now;
+          const elapsed = elapsedMs();
           setSamples(s => {
             const next = [...s, {t: elapsed / 1000, hashrate: hr}];
             return next.length > 120 ? next.slice(-120) : next;
@@ -108,18 +114,27 @@ export function useGameLoop({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [running, startsAt, effectiveElapsed]);
+  }, [running, gameEndsAt, msLeft, elapsedMs]);
 
   const reset = () => {
-    setTimeLeft(GAME_MS / 1000);
+    setTimeLeft(GAME_DURATION_MS / 1000);
     setVisualReward(0);
     setSamples([]);
     setDisplayHashrate(0);
     endedRef.current = false;
     lastSampleAtRef.current = 0;
-    pausedMsRef.current = 0;
-    pauseStartedAtRef.current = null;
   };
+
+  const syncTimeFromServer = useCallback(
+    (serverEndsAt: number, timeLeftMs?: number) => {
+      const synced =
+        timeLeftMs != null
+          ? Date.now() + timeLeftMs
+          : serverEndsAt;
+      gameEndsAtRef.current = synced;
+    },
+    [],
+  );
 
   return {
     timeLeft,
@@ -127,5 +142,6 @@ export function useGameLoop({
     samples,
     hashrate: displayHashrate,
     reset,
+    syncTimeFromServer,
   };
 }

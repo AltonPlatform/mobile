@@ -1,4 +1,4 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -24,6 +25,10 @@ import {
 import {formatApiError} from '../api/errors';
 import {TelegramAuthModal} from '../components/TelegramAuthModal';
 import {colors, radii, space} from '../theme/tokens';
+import {
+  extractOAuthCode,
+  isNativeTelegramAuthCallback,
+} from '../utils/telegramAuthLinks';
 
 const LOGO = require('../../branding/altonLogo.png');
 
@@ -38,6 +43,71 @@ export function LoginScreen() {
   const [authUrl, setAuthUrl] = useState('');
   const [redirectUri, setRedirectUri] = useState('');
   const [sessionId, setSessionId] = useState('');
+  const sessionIdRef = useRef('');
+  const exchangeInFlight = useRef(false);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  const onAuthCode = useCallback(
+    (code: string) => {
+      const sid = sessionIdRef.current;
+      if (!sid || exchangeInFlight.current) {
+        return;
+      }
+      exchangeInFlight.current = true;
+      setAuthModal(false);
+      setAuthUrl('');
+      setRedirectUri('');
+      setBusy(true);
+      InteractionManager.runAfterInteractions(() => {
+        void (async () => {
+          try {
+            const {token} = await exchangeTelegramCode(code, sid);
+            await setToken(token);
+            await refetchUser();
+          } catch (e: unknown) {
+            Alert.alert(t('Error login'), formatApiError(e));
+          } finally {
+            exchangeInFlight.current = false;
+            setBusy(false);
+          }
+        })();
+      });
+    },
+    [setToken, refetchUser, t],
+  );
+
+  useEffect(() => {
+    const handleUrl = (event: {url: string}) => {
+      if (!isNativeTelegramAuthCallback(event.url)) {
+        return;
+      }
+      const code = extractOAuthCode(event.url);
+      if (code) {
+        onAuthCode(code);
+        return;
+      }
+      try {
+        const error = new URL(event.url).searchParams.get('error');
+        if (error) {
+          Alert.alert(t('Error login'), error);
+        }
+      } catch {
+        /* ignore malformed url */
+      }
+    };
+
+    const sub = Linking.addEventListener('url', handleUrl);
+    void Linking.getInitialURL().then(url => {
+      if (url) {
+        handleUrl({url});
+      }
+    });
+
+    return () => sub.remove();
+  }, [onAuthCode, t]);
 
   const onTelegramPress = useCallback(async () => {
     setBusy(true);
@@ -53,30 +123,6 @@ export function LoginScreen() {
       setBusy(false);
     }
   }, [t]);
-
-  const onAuthCode = useCallback(
-    (code: string) => {
-      const sid = sessionId;
-      setAuthModal(false);
-      setAuthUrl('');
-      setRedirectUri('');
-      setBusy(true);
-      InteractionManager.runAfterInteractions(() => {
-        void (async () => {
-          try {
-            const {token} = await exchangeTelegramCode(code, sid);
-            await setToken(token);
-            await refetchUser();
-          } catch (e: unknown) {
-            Alert.alert(t('Error login'), formatApiError(e));
-          } finally {
-            setBusy(false);
-          }
-        })();
-      });
-    },
-    [sessionId, setToken, refetchUser, t],
-  );
 
   const onAuthCancel = useCallback(() => {
     setAuthModal(false);

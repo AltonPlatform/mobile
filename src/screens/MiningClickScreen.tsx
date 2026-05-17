@@ -77,10 +77,10 @@ export function MiningClickScreen() {
 
   const loop = useGameLoop({
     running: game.phase === 'playing' || game.phase === 'mistake',
-    paused: game.phase === 'mistake',
-    startsAt: game.startsAt,
+    gameEndsAt: game.gameEndsAt,
     stake: game.stake,
     clicks: game.clicks,
+    accrueReward: game.phase === 'playing' && !game.hadMistake,
     onTimeout: () => {
       void endMut.mutate({
         reason: 'timeout',
@@ -141,7 +141,12 @@ export function MiningClickScreen() {
 
   const onBlockPress = useCallback(
     async (index: number) => {
-      if (game.phase !== 'playing' || clickBusy) {
+      if (
+        game.phase !== 'playing' ||
+        clickBusy ||
+        endMut.isPending ||
+        loop.timeLeft <= 0.05
+      ) {
         return;
       }
       setClickBusy(true);
@@ -155,12 +160,20 @@ export function MiningClickScreen() {
           setTimeout(() => setFlashBlock(null), 200);
         }
       } catch (e: unknown) {
-        Alert.alert(t('Error'), formatApiError(e));
+        const msg = formatApiError(e);
+        if (
+          endMut.isPending ||
+          msg === 'Game is ending' ||
+          msg === 'WebSocket disconnected'
+        ) {
+          return;
+        }
+        Alert.alert(t('Error'), msg);
       } finally {
         setClickBusy(false);
       }
     },
-    [game, clickBusy, t],
+    [game, clickBusy, endMut.isPending, loop.timeLeft, t],
   );
 
   const onStart = () => {
