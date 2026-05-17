@@ -25,6 +25,12 @@ end
 target 'AltonMobile' do
   config = use_native_modules!
 
+  # Prebuilt React-Core / ReactNativeDependencies strip Fabric C++ debug symbols (Sealable,
+  # DebugStringConvertible, ShadowNode::getDebug*). Codegen / New Arch still references them → linker errors.
+  # Build RN core and third-party deps from source (slower first `pod install`, correct symbols).
+  ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+  ENV['RCT_USE_RN_DEP'] = '0'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

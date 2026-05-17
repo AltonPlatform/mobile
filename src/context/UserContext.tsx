@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {api} from '../api/client';
+import {setUnauthorizedHandler} from '../api/authSession';
 
 export type UserData = Record<string, unknown> & {
   user_id?: number;
@@ -18,6 +19,8 @@ export type UserData = Record<string, unknown> & {
   username?: string;
   claim?: string | null;
   fortune?: number;
+  chartTickets?: number | null;
+  miningTickets?: number | null;
   miningSpeed?: number;
   points?: number;
   balance?: number;
@@ -94,6 +97,15 @@ export function UserProvider({children}: {children: React.ReactNode}) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await AsyncStorage.removeItem('token');
+      setTokenState(null);
+      queryClient.removeQueries({queryKey: ['currentUser']});
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [queryClient]);
 
   const setToken = useCallback(async (t: string | null) => {
     if (t) {

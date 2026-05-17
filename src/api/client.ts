@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_BASE_URL} from '../config';
+import {notifyUnauthorized} from './authSession';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,7 +24,23 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
+function isAuthGuestPath(url: string): boolean {
+  return (
+    url.includes('/api/auth/telegram/') ||
+    url.includes('/api/login/')
+  );
+}
+
 api.interceptors.response.use(
   r => r,
-  async error => Promise.reject(error),
+  async error => {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const url = error.config?.url ?? '';
+      if ((status === 401 || status === 403) && !isAuthGuestPath(url)) {
+        notifyUnauthorized();
+      }
+    }
+    return Promise.reject(error);
+  },
 );

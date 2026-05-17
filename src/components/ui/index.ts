@@ -5,3 +5,4 @@ export {SecondaryButton} from './SecondaryButton';
 export {SectionTitle} from './SectionTitle';
 export {MutedText} from './MutedText';
 export {AppModal, AppModalClose, MODAL_SHEET_BG} from './AppModal';
+export {PanSlider} from './PanSlider';

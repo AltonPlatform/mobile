@@ -1,0 +1,20 @@
+type UnauthorizedHandler = () => void | Promise<void>;
+
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  onUnauthorized = handler;
+}
+
+export function notifyUnauthorized() {
+  const h = onUnauthorized;
+  if (h) {
+    const r = h();
+    if (r != null && typeof (r as PromiseLike<unknown>).then === 'function') {
+      (r as PromiseLike<unknown>).then(
+        () => undefined,
+        () => undefined,
+      );
+    }
+  }
+}

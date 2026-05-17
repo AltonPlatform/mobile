@@ -17,7 +17,11 @@ import {useUserContext} from '../context/UserContext';
 import {colors} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
 import {RouletteScreen} from '../screens/RouletteScreen';
-import {BoostsScreen} from '../screens/BoostsScreen';
+import {ChartGameScreen} from '../screens/ChartGameScreen';
+import {MiningClickScreen} from '../screens/MiningClickScreen';
+import {PoolsListScreen} from '../screens/PoolsListScreen';
+import {PoolDetailScreen} from '../screens/PoolDetailScreen';
+import {PoolsSummaryScreen} from '../screens/PoolsSummaryScreen';
 import {AcademyScreen} from '../screens/AcademyScreen';
 import {AcademyDetailScreen} from '../screens/AcademyDetailScreen';
 import {AcademyTestScreen} from '../screens/AcademyTestScreen';
@@ -28,6 +32,8 @@ import {WalletScreen} from '../screens/WalletScreen';
 export type HomeStackParamList = {
   HomeMain: undefined;
   Roulette: undefined;
+  ChartGame: undefined;
+  MiningClick: undefined;
   Wallet: undefined;
 };
 
@@ -36,6 +42,36 @@ export type AcademyStackParamList = {
   AcademyDetail: {lessonId: number};
   AcademyTest: {lessonId: number};
 };
+
+export type PoolsStackParamList = {
+  PoolsList: undefined;
+  PoolDetail: {poolId: string};
+  MyPoolsSummary: undefined;
+};
+
+const PoolsStack = createNativeStackNavigator<PoolsStackParamList>();
+function PoolsStackNav() {
+  return (
+    <PoolsStack.Navigator
+      screenOptions={{
+        contentStyle: {backgroundColor: colors.bg},
+        headerStyle: {backgroundColor: colors.surface},
+        headerTintColor: colors.textPrimary,
+        headerTitleStyle: {fontFamily: fontFamily.semibold},
+      }}>
+      <PoolsStack.Screen
+        name="PoolsList"
+        component={PoolsListScreen}
+        options={{headerShown: true}}
+      />
+      <PoolsStack.Screen name="PoolDetail" component={PoolDetailScreen} />
+      <PoolsStack.Screen
+        name="MyPoolsSummary"
+        component={PoolsSummaryScreen}
+      />
+    </PoolsStack.Navigator>
+  );
+}
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 function HomeStackNav() {
@@ -49,6 +85,16 @@ function HomeStackNav() {
       <HomeStack.Screen
         name="Roulette"
         component={RouletteScreen}
+        options={{headerShown: false}}
+      />
+      <HomeStack.Screen
+        name="ChartGame"
+        component={ChartGameScreen}
+        options={{headerShown: false}}
+      />
+      <HomeStack.Screen
+        name="MiningClick"
+        component={MiningClickScreen}
         options={{headerShown: false}}
       />
       <HomeStack.Screen
@@ -180,10 +226,10 @@ export function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Boosts"
-        component={BoostsScreen}
+        name="Pools"
+        component={PoolsStackNav}
         options={{
-          tabBarLabel: t('Boosts'),
+          tabBarLabel: t('Pools'),
           tabBarIcon: TabBarIconBoosts,
         }}
       />

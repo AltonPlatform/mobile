@@ -15,7 +15,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useMutation, useQuery} from '@tanstack/react-query';
 
 import {UserProfileHeader} from '../components/UserProfileHeader';
-import {MiningBlock} from '../components/MiningBlock';
+import {FarmingHomeClaim} from '../components/FarmingHomeClaim';
 import {ComboBlock} from '../components/ComboBlock';
 import {BullcoinLiquidFill} from '../components/BullcoinLiquidFill';
 import {useUserContext} from '../context/UserContext';
@@ -87,6 +87,16 @@ export function HomeScreen() {
   // ── Fortune / Spins ──
   const fortune =
     userData && typeof userData.fortune === 'number' ? userData.fortune : 0;
+
+  const chartTickets =
+    userData && typeof userData.chartTickets === 'number'
+      ? userData.chartTickets
+      : 0;
+
+  const miningTickets =
+    userData && typeof userData.miningTickets === 'number'
+      ? userData.miningTickets
+      : 0;
 
   const miningSpeed =
     typeof userData?.miningSpeed === 'number' ? userData.miningSpeed : 0;
@@ -295,9 +305,9 @@ export function HomeScreen() {
         </View>
       </View>
 
-      {/* Mining block (Start/Claim/Timer) */}
+      {/* Farming pools: claim + ссылка на пулы */}
       <View style={styles.miningWrap}>
-        <MiningBlock />
+        <FarmingHomeClaim />
       </View>
 
       {/* Spacer pushes grid to bottom */}
@@ -325,14 +335,32 @@ export function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        <View style={[styles.tile, styles.brandsTile, styles.testnetTile]}>
+        <TouchableOpacity
+          style={[styles.tile, styles.brandsTile, styles.testnetTile]}
+          onPress={() => nav.navigate('ChartGame')}
+          activeOpacity={0.85}>
           <View style={styles.brandsTitleRow}>
-            <Text style={styles.tileTitle}>{t('Testnet')}</Text>
-            <ClockIcon size={16} />
+            <Text style={styles.tileTitle}>{t('chart_game_title')}</Text>
+            <TicketIcon size={14} color="#38bdf8" />
           </View>
-          <Text style={styles.tileDesc}>{t('Soon')}</Text>
-        </View>
+          <View style={styles.tileDescRow}>
+            <Text style={styles.tileDesc}>{chartTickets || 0}/20</Text>
+          </View>
+        </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={[styles.tile, styles.miningClickTile]}
+        onPress={() => nav.navigate('MiningClick')}
+        activeOpacity={0.85}>
+        <View style={styles.brandsTitleRow}>
+          <Text style={styles.tileTitle}>{t('mining_click_title')}</Text>
+          <TicketIcon size={14} color="#22c55e" />
+        </View>
+        <View style={styles.tileDescRow}>
+          <Text style={styles.tileDesc}>{miningTickets || 0}/20</Text>
+        </View>
+      </TouchableOpacity>
 
       <AppModal
         visible={dailyBonusOpen}
@@ -523,6 +551,10 @@ const styles = StyleSheet.create({
   },
   testnetTile: {
     justifyContent: 'center',
+  },
+  miningClickTile: {
+    marginTop: 8,
+    width: '100%',
   },
   rouletteContent: {
     flexDirection: 'row',
