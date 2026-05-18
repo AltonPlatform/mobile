@@ -14,6 +14,11 @@ import type {RootStackParamList} from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const screenOptions = {
+  headerShown: false,
+  contentStyle: {backgroundColor: colors.bg},
+} as const;
+
 const styles = StyleSheet.create({
   boot: {
     flex: 1,
@@ -23,37 +28,19 @@ const styles = StyleSheet.create({
   },
 });
 
-export function RootNavigator() {
-  const {token, bootstrapping, userData} = useUserContext();
+function AuthNavigator() {
+  return (
+    <Stack.Navigator screenOptions={screenOptions}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+    </Stack.Navigator>
+  );
+}
 
-  if (bootstrapping) {
-    return (
-      <View style={styles.boot}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  const needsOnboarding =
-    !!token &&
-    userData &&
-    (userData.pointLevel === undefined || userData.pointLevel === null);
-
-  const initialRouteName = !token
-    ? 'Login'
-    : needsOnboarding
-      ? 'Onboarding'
-      : 'MainTabs';
-
+function AppNavigator({initialRouteName}: {initialRouteName: 'MainTabs' | 'Onboarding'}) {
   return (
     <Stack.Navigator
-      key={token ?? 'guest'}
       initialRouteName={initialRouteName}
-      screenOptions={{
-        headerShown: false,
-        contentStyle: {backgroundColor: colors.bg},
-      }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
+      screenOptions={screenOptions}>
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen
@@ -72,5 +59,30 @@ export function RootNavigator() {
         options={{headerShown: true, title: 'TON Connect'}}
       />
     </Stack.Navigator>
+  );
+}
+
+export function RootNavigator() {
+  const {token, bootstrapping, userData} = useUserContext();
+
+  if (bootstrapping) {
+    return (
+      <View style={styles.boot}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!token) {
+    return <AuthNavigator />;
+  }
+
+  const needsOnboarding =
+    !userData ||
+    userData.pointLevel === undefined ||
+    userData.pointLevel === null;
+
+  return (
+    <AppNavigator initialRouteName={needsOnboarding ? 'Onboarding' : 'MainTabs'} />
   );
 }

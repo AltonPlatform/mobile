@@ -7,6 +7,7 @@ import {formatApiError} from '../api/errors';
 import type {PoolChartPoint} from '../types/pools';
 import {PoolPriceChart} from './PoolPriceChart';
 import {colors, space} from '../theme/tokens';
+import {formatPoolSpot} from '../utils/poolFormat';
 
 /** Synthetic last point — not merged from API pagination keys. */
 const LIVE_KEY_PREFIX = '__live__:';
@@ -78,7 +79,7 @@ export function PoolChartSection({
     if (!spot) {
       return undefined;
     }
-    return t('farming_chart_live_line', {value: spot});
+    return t('farming_chart_live_line', {value: formatPoolSpot(spot)});
   }, [currentSpotApprox, t]);
 
   const mountedRef = useRef(true);

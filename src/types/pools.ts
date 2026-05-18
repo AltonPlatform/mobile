@@ -67,6 +67,8 @@ export type PoolsByPoolRow = {
   poolId: string;
   amount: string;
   storedRewards: string;
+  /** Balance earned per hour from this pool position. */
+  rewardPerHour?: string;
   poolName?: string;
 };
 
@@ -74,6 +76,7 @@ export type PoolsSummaryResponse = {
   totalUnclaimedStoredRewards: string;
   totalFarmingRewardsClaimed: string;
   totalFarmingProfitEstimate: string;
+  totalRewardPerHour: string;
   lastFarmingClaimAt: string | null;
   byPool: PoolsByPoolRow[];
 };
@@ -111,4 +114,6 @@ export type SellPoolBody = {
 
 export type ClaimPoolsBody = {
   idempotencyKey?: string;
+  /** После просмотра rewarded-рекламы (CAS) — удвоить выплату. */
+  rewardedAd?: boolean;
 };

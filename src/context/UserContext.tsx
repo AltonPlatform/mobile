@@ -18,7 +18,6 @@ export type UserData = Record<string, unknown> & {
   last_name?: string;
   username?: string;
   claim?: string | null;
-  fortune?: number;
   chartTickets?: number | null;
   miningTickets?: number | null;
   miningSpeed?: number;
@@ -98,24 +97,32 @@ export function UserProvider({children}: {children: React.ReactNode}) {
     };
   }, []);
 
-  useEffect(() => {
-    setUnauthorizedHandler(async () => {
-      await AsyncStorage.removeItem('token');
-      setTokenState(null);
-      queryClient.removeQueries({queryKey: ['currentUser']});
-    });
-    return () => setUnauthorizedHandler(null);
+  const clearSession = useCallback(async () => {
+    setTokenState(null);
+    queryClient.setQueryData(['currentUser'], undefined);
+    await queryClient.cancelQueries({queryKey: ['currentUser']});
+    queryClient.removeQueries({queryKey: ['currentUser']});
+    await AsyncStorage.removeItem('token');
   }, [queryClient]);
 
-  const setToken = useCallback(async (t: string | null) => {
-    if (t) {
-      await AsyncStorage.setItem('token', t);
-    } else {
-      await AsyncStorage.removeItem('token');
-    }
-    setTokenState(t);
-    await queryClient.invalidateQueries({queryKey: ['currentUser']});
-  }, [queryClient]);
+  useEffect(() => {
+    setUnauthorizedHandler(() => clearSession());
+    return () => setUnauthorizedHandler(null);
+  }, [clearSession]);
+
+  const setToken = useCallback(
+    async (t: string | null) => {
+      if (t) {
+        await AsyncStorage.setItem('token', t);
+        setTokenState(t);
+        await queryClient.invalidateQueries({queryKey: ['currentUser']});
+        return;
+      }
+
+      await clearSession();
+    },
+    [clearSession, queryClient],
+  );
 
   const userQuery = useQuery({
     queryKey: ['currentUser'],
@@ -133,25 +140,23 @@ export function UserProvider({children}: {children: React.ReactNode}) {
     if (axios.isAxiosError(err)) {
       const s = err.response?.status;
       if (s === 401 || s === 403) {
-        void (async () => {
-          await AsyncStorage.removeItem('token');
-          setTokenState(null);
-        })();
+        void clearSession();
       }
     }
-  }, [userQuery.error, token]);
+  }, [userQuery.error, token, clearSession]);
 
+  /** Only block UI on cold start while restoring token / first profile fetch. */
   const bootstrapping =
-    !isHydrated || (!!token && userQuery.isPending);
+    !isHydrated ||
+    (!!token && userQuery.data === undefined && userQuery.fetchStatus === 'fetching');
 
   const refetchUser = useCallback(async () => {
     await userQuery.refetch();
   }, [userQuery]);
 
   const logout = useCallback(async () => {
-    await setToken(null);
-    queryClient.removeQueries({queryKey: ['currentUser']});
-  }, [queryClient, setToken]);
+    await clearSession();
+  }, [clearSession]);
 
   const value = useMemo<UserContextValue>(
     () => ({

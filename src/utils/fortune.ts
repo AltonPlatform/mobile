@@ -52,15 +52,7 @@ export function isYesterday(date: Date | string | null | undefined): boolean {
   );
 }
 
-export function sumFormat(n: number): string {
-  if (n >= 1_000_000) {
-    return `${(n / 1_000_000).toFixed(1)}M`;
-  }
-  if (n >= 1_000) {
-    return `${(n / 1_000).toFixed(1)}K`;
-  }
-  return String(Math.floor(n));
-}
+export {sumFormat, localeFormat, formatSpeed} from './formatNumbers';
 
 /** Compact locale number formatting (TWA `localeFormat`) */
 export function localeFormatNum(

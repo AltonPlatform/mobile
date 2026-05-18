@@ -36,7 +36,7 @@ npx react-native run-android
 | Item | Where |
 |------|--------|
 | **API** | `src/config.ts` → `API_BASE_URL` for production |
-| **Appodeal** | `src/config.ts` → `APPODEAL_APP_KEY` |
+| **CAS.AI** | `src/config.ts` → `CAS_ID` (`demo` for test ads) |
 | **Telegram OIDC** | Backend `TELEGRAM_CLIENT_ID` (see `backend/.env.example`) |
 | **Telegram Login SDK (Android)** | GitHub Packages Maven + `GITHUB_TOKEN` — [telegram-login-android](https://github.com/TelegramMessenger/telegram-login-android). Replace stub in `TelegramLoginModule.kt` with `TelegramLogin.startLogin` / `handleLoginResponse`. |
 | **Telegram Login SDK (iOS)** | Add SPM `https://github.com/TelegramMessenger/telegram-login-ios`, replace stub in `TelegramLoginModule.m`, Universal Links |
@@ -49,4 +49,4 @@ New endpoint: `POST /api/login/telegram-sdk` with `{ idToken, referrerId? }`. Re
 
 ## Ads
 
-Appodeal Rewarded Video is initialized in `App.tsx`. Mining ×2, roulette extra spin, academy retry use `src/hooks/useAppodeal.ts` (FIFO reward callbacks).
+CAS.AI Rewarded Video (test mode) is initialized in `App.tsx` via `useCASInit`. Mining ×2, roulette extra spin, academy retry use `src/hooks/useCASRewarded.ts` (FIFO reward callbacks).

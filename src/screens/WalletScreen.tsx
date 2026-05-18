@@ -26,6 +26,7 @@ import {
   WalletIcon,
 } from '../components/Icons';
 import {useTonConnect} from '../hooks/useTonConnect';
+import {useSyncWalletWithBackend} from '../hooks/useSyncWalletWithBackend';
 import {useAltonNfts, sumVoucherAmountFromNfts} from '../hooks/useAltonNfts';
 import {formatPublicKey} from '../utils/walletDisplay';
 import {colors, space} from '../theme/tokens';
@@ -76,22 +77,12 @@ export function WalletScreen() {
     [connected, friendlyAddress],
   );
 
-  const saveMut = useMutation({
-    mutationFn: async (payload: {address: string; publicKey: string}) => {
-      await api.post('/api/users/wallet', payload);
-    },
-    onSuccess: () => {
-      refetchUser();
-      Alert.alert(
-        t('OK', {defaultValue: 'OK'}),
-        t('Wallet saved', {defaultValue: 'Wallet saved'}),
-      );
-    },
-    onError: () =>
-      Alert.alert(
-        t('Error'),
-        t('Could not save wallet', {defaultValue: 'Could not save wallet'}),
-      ),
+  useSyncWalletWithBackend({
+    walletAccount,
+    userWallet: userData?.wallet,
+    refetchUser,
+    disconnect,
+    showSuccessAlert: true,
   });
 
   const voucherMut = useMutation({
@@ -102,28 +93,6 @@ export function WalletScreen() {
       refetchUser().catch(() => undefined);
     },
   });
-
-  useEffect(() => {
-    const address = walletAccount?.address ?? '';
-    const publicKey = walletAccount?.publicKey ?? '';
-    if (!address || saveMut.isPending) {
-      return;
-    }
-    const currentAddress =
-      typeof userData?.wallet?.address === 'string' ? userData.wallet.address : '';
-    const currentKey =
-      typeof userData?.wallet?.publicKey === 'string' ? userData.wallet.publicKey : '';
-    if (address === currentAddress && publicKey === currentKey) {
-      return;
-    }
-    saveMut.mutate({address, publicKey});
-  }, [
-    walletAccount?.address,
-    walletAccount?.publicKey,
-    userData?.wallet?.address,
-    userData?.wallet?.publicKey,
-    saveMut,
-  ]);
 
   useEffect(() => {
     if (!connected || !nftsSuccess || !userData) {
@@ -345,10 +314,6 @@ export function WalletScreen() {
             <Text style={styles.benefitBullet}>
               {'\u2022 '}
               {t('X2 combo reward')}
-            </Text>
-            <Text style={styles.benefitBullet}>
-              {'\u2022 '}
-              {t('X2 roulette reward')}
             </Text>
           </View>
         </View>

@@ -1,36 +1,27 @@
-import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
+import React, {useMemo} from 'react';
 import {
-  LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, {Circle, Line, Path, Rect, Text as SvgText} from 'react-native-svg';
+import {LineChart} from 'react-native-wagmi-charts';
 import {useTranslation} from 'react-i18next';
 
 import {colors, space} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
 import type {PoolChartPoint} from '../types/pools';
 import {
-  buildChartPlot,
-  chartContentWidthFromPoints,
-  scaledSpotToDecimalString,
-} from '../utils/poolChartMath';
+  formatChartDatetime,
+  formatChartPrice,
+} from '../utils/poolChartWorklets';
+import {formatPoolSpot} from '../utils/poolFormat';
+import {poolPointsToWagmiData} from '../utils/poolChartData';
 
-/** Тёмная область графика в духе TradingView (линия без свечей). */
 const PLOT_BG = '#0a0e14';
-const GRID_MAJOR = 'rgba(71, 85, 105, 0.5)';
-const GRID_MINOR = 'rgba(51, 65, 85, 0.28)';
-const LINE_STROKE = '#38bdf8';
-const LINE_WIDTH = 2;
-const PAD_L = 6;
-const PAD_T = 6;
-const PAD_B = 18;
-const PRICE_AXIS_W = 56;
-const PLOT_H = 156;
+const LINE_COLOR = '#38bdf8';
+const CHART_HEIGHT = 200;
 
 type Props = {
   points?: PoolChartPoint[] | null;
@@ -43,14 +34,6 @@ type Props = {
   highlightLastPoint?: boolean;
 };
 
-function compactSpotRange(v: bigint): string {
-  const s = scaledSpotToDecimalString(v);
-  if (s.length <= 30) {
-    return s;
-  }
-  return `${s.slice(0, 14)}…${s.slice(-12)}`;
-}
-
 export function PoolPriceChart({
   points: pointsProp,
   emptyLabel,
@@ -59,118 +42,30 @@ export function PoolPriceChart({
   onLoadOlder,
   swipeHint,
   liveSpotFooter,
-  highlightLastPoint,
 }: Props) {
   const {t} = useTranslation();
-  const points = pointsProp ?? [];
-  const [viewportW, setViewportW] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollXRef = useRef(0);
-  const lenBeforeLoadRef = useRef(0);
-  const scrollBeforeLoadRef = useRef(0);
-  const prevLoadingOlderRef = useRef(false);
-  const initialScrollDoneRef = useRef(false);
-  const lastEdgeLoadRef = useRef(0);
-  const prevOldestTRef = useRef<string | null>(null);
+  const {width: screenW} = useWindowDimensions();
+  const chartWidth = Math.max(280, screenW - space.md * 2);
 
-  const nowTimeLabel = t('farming_chart_time_now');
-
-  useEffect(() => {
-    if (loadingOlder && !prevLoadingOlderRef.current) {
-      lenBeforeLoadRef.current = points.length;
-      scrollBeforeLoadRef.current = scrollXRef.current;
-      prevOldestTRef.current = points[0]?.t ?? null;
-    }
-    prevLoadingOlderRef.current = !!loadingOlder;
-  }, [loadingOlder, points.length, points]);
-
-  const contentW =
-    viewportW > 0
-      ? chartContentWidthFromPoints(points, viewportW, PAD_L, PRICE_AXIS_W)
-      : chartContentWidthFromPoints(points, 320, PAD_L, PRICE_AXIS_W);
-
-  const plot = React.useMemo(
-    () =>
-      buildChartPlot({
-        points,
-        contentW,
-        padL: PAD_L,
-        padT: PAD_T,
-        padB: PAD_B,
-        priceAxisW: PRICE_AXIS_W,
-        plotH: PLOT_H,
-        nowTimeLabel,
-      }),
-    [points, contentW, nowTimeLabel],
+  const chartData = useMemo(
+    () => poolPointsToWagmiData(pointsProp),
+    [pointsProp],
   );
 
-  useLayoutEffect(() => {
-    if (!loadingOlder && lenBeforeLoadRef.current > 0 && prevOldestTRef.current) {
-      const added = points.length - lenBeforeLoadRef.current;
-      if (added > 0 && scrollRef.current && points[0]?.t !== prevOldestTRef.current) {
-        const oldW = chartContentWidthFromPoints(
-          points.slice(added),
-          viewportW || 320,
-          PAD_L,
-          PRICE_AXIS_W,
-        );
-        const newW = chartContentWidthFromPoints(
-          points,
-          viewportW || 320,
-          PAD_L,
-          PRICE_AXIS_W,
-        );
-        const delta = Math.max(0, newW - oldW);
-        const target = scrollBeforeLoadRef.current + delta;
-        requestAnimationFrame(() => {
-          scrollRef.current?.scrollTo({
-            x: Math.max(0, target),
-            animated: false,
-          });
-        });
-      }
-      lenBeforeLoadRef.current = 0;
-      prevOldestTRef.current = null;
+  const minMax = useMemo(() => {
+    if (chartData.length === 0) {
+      return null;
     }
-  }, [loadingOlder, points, viewportW]);
+    let min = chartData[0]!.value;
+    let max = chartData[0]!.value;
+    for (const row of chartData) {
+      min = Math.min(min, row.value);
+      max = Math.max(max, row.value);
+    }
+    return {min, max};
+  }, [chartData]);
 
-  useLayoutEffect(() => {
-    if (
-      points.length === 0 ||
-      viewportW <= 0 ||
-      !scrollRef.current ||
-      initialScrollDoneRef.current
-    ) {
-      return;
-    }
-    const cw = chartContentWidthFromPoints(points, viewportW, PAD_L, PRICE_AXIS_W);
-    initialScrollDoneRef.current = true;
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        x: Math.max(0, cw - viewportW),
-        animated: false,
-      });
-    });
-  }, [points.length, viewportW]);
-
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = e.nativeEvent.contentOffset.x;
-    scrollXRef.current = x;
-    if (!onLoadOlder || !hasMore || loadingOlder) {
-      return;
-    }
-    if (x > 80) {
-      return;
-    }
-    const now = Date.now();
-    if (now - lastEdgeLoadRef.current < 750) {
-      return;
-    }
-    lastEdgeLoadRef.current = now;
-    Promise.resolve(onLoadOlder()).catch(() => {});
-  };
-
-  if (points.length === 0) {
+  if (chartData.length === 0) {
     return (
       <View style={styles.emptyWrap}>
         <Text style={styles.empty}>{emptyLabel}</Text>
@@ -178,127 +73,78 @@ export function PoolPriceChart({
     );
   }
 
-  if (!plot) {
-    return null;
-  }
+  const yPad = minMax
+    ? Math.max((minMax.max - minMax.min) * 0.08, minMax.max * 0.002)
+    : 0;
+  const yRange = minMax
+    ? {
+        min: Math.max(0, minMax.min - yPad),
+        max: minMax.max + yPad,
+      }
+    : undefined;
 
-  const {pathD, lastX, lastY, minV, maxV, innerW, yTicks, vLines, timeLabels} =
-    plot;
+  return (
+    <View style={styles.wrap}>
+      {hasMore && onLoadOlder ? (
+        <TouchableOpacity
+          style={styles.loadOlderBtn}
+          onPress={() => {
+            void Promise.resolve(onLoadOlder()).catch(() => {});
+          }}
+          disabled={loadingOlder}
+          activeOpacity={0.85}>
+          <Text style={styles.loadOlderText}>
+            {loadingOlder
+              ? t('Loading...')
+              : swipeHint ?? t('farming_chart_load_older')}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
-  const chartBody = (
-    <View style={{width: contentW}}>
-      <Svg width={contentW} height={PLOT_H}>
-        <Rect
-          x={0}
-          y={0}
-          width={contentW}
-          height={PLOT_H}
-          rx={8}
-          ry={8}
-          fill={PLOT_BG}
-        />
-        {vLines.map((vx, idx) => (
-          <Line
-            key={`v-${idx}`}
-            x1={vx}
-            y1={PAD_T}
-            x2={vx}
-            y2={PLOT_H - PAD_B}
-            stroke={idx % 2 === 0 ? GRID_MAJOR : GRID_MINOR}
-            strokeWidth={1}
-          />
-        ))}
-        {yTicks.map((row, idx) => (
-          <Line
-            key={`h-${idx}`}
-            x1={PAD_L}
-            y1={row.y}
-            x2={PAD_L + innerW}
-            y2={row.y}
-            stroke={GRID_MINOR}
-            strokeWidth={1}
-          />
-        ))}
-        {pathD ? (
-          <Path
-            d={pathD}
-            stroke={LINE_STROKE}
-            strokeWidth={LINE_WIDTH}
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ) : null}
-        {highlightLastPoint && pathD ? (
-          <Circle
-            cx={lastX}
-            cy={lastY}
-            r={4}
-            fill={LINE_STROKE}
-            stroke={colors.textPrimary}
-            strokeWidth={1.5}
-          />
-        ) : null}
-        {yTicks.map((row, idx) => (
-          <SvgText
-            key={`py-${idx}`}
-            x={PAD_L + innerW + 4}
-            y={row.y + 4}
-            fontSize={10}
-            fill="#94a3b8"
-            fontFamily={fontFamily.medium}>
-            {row.label}
-          </SvgText>
-        ))}
-        {timeLabels.map((row, idx) => (
-          <SvgText
-            key={`tx-${idx}`}
-            x={row.x}
-            y={PLOT_H - 4}
-            fontSize={9}
-            fill="#64748b"
-            textAnchor="middle"
-            fontFamily={fontFamily.regular}>
-            {row.text}
-          </SvgText>
-        ))}
-      </Svg>
-      <Text style={styles.range} numberOfLines={2}>
-        {compactSpotRange(minV)} → {compactSpotRange(maxV)}
-      </Text>
+      <View style={[styles.chartBox, {width: chartWidth}]}>
+        <LineChart.Provider data={chartData} yRange={yRange}>
+          <View style={styles.labelsRow}>
+            <LineChart.PriceText
+              style={styles.priceLabel}
+              format={formatChartPrice}
+            />
+            <LineChart.DatetimeText
+              style={styles.timeLabel}
+              format={formatChartDatetime}
+            />
+          </View>
+          <LineChart width={chartWidth} height={CHART_HEIGHT}>
+            <LineChart.Path color={LINE_COLOR} width={2}>
+              <LineChart.Gradient color={LINE_COLOR} />
+            </LineChart.Path>
+            <LineChart.CursorCrosshair color={LINE_COLOR}>
+              <LineChart.Tooltip>
+                <LineChart.PriceText
+                  style={styles.tooltipPrice}
+                  format={formatChartPrice}
+                />
+              </LineChart.Tooltip>
+              <LineChart.Tooltip position="bottom">
+                <LineChart.DatetimeText
+                  style={styles.tooltipTime}
+                  format={formatChartDatetime}
+                />
+              </LineChart.Tooltip>
+            </LineChart.CursorCrosshair>
+          </LineChart>
+        </LineChart.Provider>
+      </View>
+
+      {minMax ? (
+        <Text style={styles.range} numberOfLines={1}>
+          {formatPoolSpot(String(minMax.min))} → {formatPoolSpot(String(minMax.max))}
+        </Text>
+      ) : null}
       {liveSpotFooter ? (
         <Text style={styles.liveFooter} numberOfLines={2}>
           {liveSpotFooter}
         </Text>
       ) : null}
-      {swipeHint && hasMore && onLoadOlder ? (
-        <Text style={styles.hint}>{swipeHint}</Text>
-      ) : null}
-    </View>
-  );
-
-  return (
-    <View
-      style={styles.wrap}
-      onLayout={(e: LayoutChangeEvent) => {
-        const width = e.nativeEvent.layout.width;
-        if (width > 0) {
-          setViewportW(width);
-        }
-      }}>
-      {viewportW <= 0 ? (
-        <View style={{height: PLOT_H}} />
-      ) : (
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          showsHorizontalScrollIndicator
-          scrollEventThrottle={16}
-          onScroll={onScroll}
-          bounces>
-          {chartBody}
-        </ScrollView>
-      )}
     </View>
   );
 }
@@ -317,6 +163,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
   },
+  loadOlderBtn: {
+    alignSelf: 'flex-start',
+    marginBottom: space.sm,
+    paddingVertical: 6,
+    paddingHorizontal: space.sm,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  loadOlderText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontFamily: fontFamily.semibold,
+  },
+  chartBox: {
+    backgroundColor: PLOT_BG,
+    borderRadius: 12,
+    overflow: 'hidden',
+    paddingTop: space.sm,
+    paddingBottom: space.xs,
+  },
+  labelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: space.sm,
+    marginBottom: 4,
+    minHeight: 22,
+  },
+  priceLabel: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontFamily: fontFamily.semibold,
+  },
+  timeLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontFamily: fontFamily.regular,
+  },
+  tooltipPrice: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontFamily: fontFamily.semibold,
+  },
+  tooltipTime: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontFamily: fontFamily.regular,
+  },
   range: {
     marginTop: 6,
     color: colors.textMuted,
@@ -328,11 +224,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
     fontFamily: fontFamily.medium,
-  },
-  hint: {
-    marginTop: 6,
-    color: colors.textMuted,
-    fontSize: 11,
-    fontFamily: fontFamily.regular,
   },
 });

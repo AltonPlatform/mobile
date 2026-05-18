@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback, useRef, useMemo} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -7,218 +7,226 @@ import {
   ActivityIndicator,
   Animated,
 } from 'react-native';
-import {useMutation} from '@tanstack/react-query';
+import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
-import {api} from '../api/client';
+import {postPoolsClaim} from '../api/pools';
+import {usePoolsSummaryLive} from '../hooks/usePoolsSummaryLive';
+import {formatApiError, getApiErrorCode} from '../api/errors';
+import {newIdempotencyKey} from '../utils/idempotencyKey';
 import {useUserContext} from '../context/UserContext';
-import {useAppodealRewarded} from '../hooks/useAppodeal';
+import {useCASRewarded} from '../hooks/useCASRewarded';
 import {colors, radii} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
-import {levelXp} from '../utils/level';
 import type {HomeStackParamList} from '../navigation/MainTabs';
-import {VideoIcon, PointCoinIcon} from './Icons';
-import {AppModal, AppModalClose} from './ui';
+import {BalanceCoinIcon} from './Icons';
+import {FarmingClaimX2Modal} from './FarmingClaimX2Modal';
+import {formatPoolBigInt} from '../utils/poolFormat';
 import {
-  calculateCoinsEarnedForClaimWindow,
-  getRemainingSecondsFromClaim,
-  MINING_CYCLE_SECONDS,
-} from '../utils/miningProfit';
+  estimateUnclaimedNumberAt,
+  formatLinearEarnedDisplay,
+  formatPoolBigIntForDisplay,
+  getFarmingBullcoinFillPercent,
+  resolveTotalRewardPerHour,
+  getFarmingCooldownRemainingMs,
+  hasPoolPositions,
+  hasUnclaimedPoolRewards,
+  isFarmingClaimOnCooldown,
+  nextClaimAtFromSummary,
+} from '../utils/poolFarmingCycle';
 
-/** frontend/src/assets/css/App.css — блок таймера майнинга */
 const WEB_TIMER_BORDER_RADIUS_PX = 100;
-
-function localeFormat(n: number) {
-  try {
-    return Math.floor(n).toLocaleString(undefined, {maximumFractionDigits: 0});
-  } catch {
-    return String(Math.floor(n));
-  }
-}
-
-function sumFormat(n: number) {
-  if (n >= 1_000_000) {
-    return `${(n / 1_000_000).toFixed(1)}M`;
-  }
-  if (n >= 1_000) {
-    return `${(n / 1_000).toFixed(1)}K`;
-  }
-  return localeFormat(n);
-}
 
 export function MiningBlock() {
   const {t} = useTranslation();
   const nav = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
-  const {refetchUser, userData} = useUserContext();
-  /** Пустой тик раз в 100 ms — перерисовка, `timeLeft` / profit из `claim` и часов. */
-  const [, setRenderTick] = useState(0);
-  const [modalClaimOpen, setModalClaimOpen] = useState(false);
-  const [modalNextStageOpen, setModalNextStageOpen] = useState(false);
-  const [modalBannerNotFound, setModalBannerNotFound] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [nextStage, setNextStage] = useState(false);
+  const {token, refetchUser} = useUserContext();
+  const queryClient = useQueryClient();
+  const [cooldownUntilIso, setCooldownUntilIso] = useState<string | null>(null);
+  const [claimHint, setClaimHint] = useState<string | null>(null);
+  const [claimModalOpen, setClaimModalOpen] = useState(false);
   const [adLoading, setAdLoading] = useState(false);
-  const [stopClaimTimer, setStopClaimTimer] = useState(false);
-  const [claimAdUnavailable, setClaimAdUnavailable] = useState(false);
-  /** Remount TimerBar when opening modal or after ad error so countdown restarts */
-  const [claimModalKey, setClaimModalKey] = useState(0);
-  /** Как TWA: кнопка появляется с fade-in после инициализации */
+  const [resumeClaimTimer, setResumeClaimTimer] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const buttonOpacity = useRef(new Animated.Value(0)).current;
 
-  const claimMut = useMutation({
-    mutationFn: async (params: {claim_date: Date; rewarded_ad?: boolean}) => {
-      const {data} = await api.post('/api/users/claim', params);
-      return data;
-    },
-    onSuccess: () => refetchUser(),
-  });
+  const summaryQuery = usePoolsSummaryLive(!!token);
+  const summary = summaryQuery.data;
+  const estimatedUnclaimed = summaryQuery.estimatedUnclaimed;
+  const now = summaryQuery.nowMs;
+  const displayNow = summaryQuery.displayNowMs;
+  const syncedAtMs = summaryQuery.syncedAtMs;
 
-  const calculateCoinsEarned = useCallback(() => {
-    return calculateCoinsEarnedForClaimWindow(userData);
-  }, [userData]);
+  useEffect(() => {
+    if (!summary?.lastFarmingClaimAt || !cooldownUntilIso) {
+      return;
+    }
+    const fromSummary = nextClaimAtFromSummary(summary.lastFarmingClaimAt);
+    if (
+      fromSummary &&
+      Math.abs(
+        new Date(fromSummary).getTime() - new Date(cooldownUntilIso).getTime(),
+      ) < 5000
+    ) {
+      setCooldownUntilIso(null);
+    }
+  }, [summary?.lastFarmingClaimAt, cooldownUntilIso]);
 
-  const timeLeft = getRemainingSecondsFromClaim(
-    userData?.claim != null ? String(userData.claim) : null,
+  useEffect(() => {
+    if (summaryQuery.isSuccess || summaryQuery.isError || !token) {
+      const delayId = setTimeout(() => setShowButton(true), 100);
+      return () => clearTimeout(delayId);
+    }
+  }, [summaryQuery.isSuccess, summaryQuery.isError, token]);
+
+  const lastClaimAt = summary?.lastFarmingClaimAt ?? null;
+  const onCooldown = useMemo(() => {
+    if (cooldownUntilIso) {
+      return new Date(cooldownUntilIso).getTime() > now;
+    }
+    return isFarmingClaimOnCooldown(lastClaimAt, now);
+  }, [cooldownUntilIso, lastClaimAt, now]);
+
+  const earnedLinear = useMemo(() => {
+    if (!summary) {
+      return null;
+    }
+    const n = estimateUnclaimedNumberAt(summary, syncedAtMs, displayNow);
+    if (!Number.isFinite(n) || n > Number.MAX_SAFE_INTEGER) {
+      return null;
+    }
+    return n;
+  }, [summary, syncedAtMs, displayNow]);
+
+  const profitPerHourDisplay = formatPoolBigInt(
+    resolveTotalRewardPerHour(summary),
   );
+  const canClaim =
+    !!summary && hasUnclaimedPoolRewards(estimatedUnclaimed) && !onCooldown;
 
-  const isMining = timeLeft > 0;
-
-  const profit = calculateCoinsEarnedForClaimWindow(userData);
-
-  useEffect(() => {
-    if (!userData) {
-      return;
-    }
-    setIsInitialized(true);
-  }, [userData]);
+  const showTimer = onCooldown;
 
   useEffect(() => {
-    const id = setInterval(() => setRenderTick(n => n + 1), 100);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    if (!isInitialized) {
-      return;
-    }
-    const delayId = setTimeout(() => setShowButton(true), 100);
-    return () => clearTimeout(delayId);
-  }, [isInitialized]);
-
-  useEffect(() => {
-    if (showButton && !isMining) {
+    if (showButton && !showTimer) {
       Animated.timing(buttonOpacity, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
       }).start();
     }
-  }, [showButton, isMining, buttonOpacity]);
+  }, [showButton, showTimer, buttonOpacity]);
 
-  const handleStartMining = useCallback(() => {
-    if (claimMut.isPending) {
-      return;
-    }
-    const remaining = getRemainingSecondsFromClaim(
-      userData?.claim != null ? String(userData.claim) : null,
-    );
-
-    if (userData?.claim && remaining <= 0) {
-      const earned = calculateCoinsEarned() * 2;
-      const maxXp = levelXp(
-        typeof userData?.pointLevel === 'number' ? userData.pointLevel : 1,
-      );
-      const toLevel = earned + (typeof userData?.pointXp === 'number' ? userData.pointXp : 0);
-      const fortune =
-        typeof userData?.fortune === 'number' ? userData.fortune : 0;
-
-      if (fortune > 20 && !nextStage) {
-        setModalNextStageOpen(true);
-      } else if (toLevel >= maxXp && !nextStage && fortune > 0) {
-        setModalNextStageOpen(true);
-      } else {
-        setClaimAdUnavailable(false);
-        setStopClaimTimer(false);
-        setAdLoading(false);
-        setClaimModalKey(k => k + 1);
-        setModalClaimOpen(true);
-      }
-    } else {
-      if (userData?.claim && remaining > 0) {
-        return;
-      }
-      claimMut.mutate({claim_date: new Date()});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData, calculateCoinsEarned, nextStage]);
-
-  useEffect(() => {
-    if (nextStage) {
-      handleStartMining();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nextStage]);
-
-  const simpleCloseNextStage = () => {
-    setNextStage(true);
-    setModalNextStageOpen(false);
-  };
-
-  const claimWithoutAd = useCallback(() => {
-    const remaining = getRemainingSecondsFromClaim(
-      userData?.claim != null ? String(userData.claim) : null,
-    );
-    if (remaining <= 0) {
-      claimMut.mutate({claim_date: new Date()});
-      setNextStage(false);
-    }
-    setStopClaimTimer(true);
-    setModalClaimOpen(false);
-    setClaimAdUnavailable(false);
-    setAdLoading(false);
-  }, [claimMut, userData?.claim]);
-
-  const simpleCloseClaim = () => {
-    claimWithoutAd();
-  };
-
-  const onAdReward = useCallback(() => {
-    setAdLoading(false);
-    setStopClaimTimer(false);
-    claimMut.mutate({claim_date: new Date(), rewarded_ad: true});
-    setClaimAdUnavailable(false);
-    setModalClaimOpen(false);
-  }, [claimMut]);
-
-  const {showRewarded} = useAppodealRewarded({
-    onReward: onAdReward,
-    onFail: () => {
+  const claimMut = useMutation({
+    mutationFn: async (rewardedAd?: boolean) => {
+      const idempotencyKey = newIdempotencyKey();
+      return postPoolsClaim({idempotencyKey, rewardedAd: !!rewardedAd});
+    },
+    onSuccess: async data => {
+      setClaimHint(null);
       setAdLoading(false);
-      setStopClaimTimer(false);
-      setClaimAdUnavailable(true);
-      setClaimModalKey(k => k + 1);
+      setClaimModalOpen(false);
+      if (data.nextClaimAt) {
+        setCooldownUntilIso(data.nextClaimAt);
+      }
+      await queryClient.invalidateQueries({queryKey: ['poolsSummary']});
+      await queryClient.invalidateQueries({queryKey: ['poolMe']});
+      await refetchUser();
+    },
+    onError: (e: unknown) => {
+      setAdLoading(false);
+      const code = getApiErrorCode(e);
+      setClaimHint(formatApiError(e));
+      if (code === 'ClaimCooldown' && summary?.lastFarmingClaimAt) {
+        setCooldownUntilIso(nextClaimAtFromSummary(summary.lastFarmingClaimAt));
+      }
     },
   });
 
-  const hours = Math.floor(timeLeft / 3600);
-  const minutes = Math.floor((timeLeft % 3600) / 60);
-  const percentagePassed =
-    ((MINING_CYCLE_SECONDS - timeLeft) / MINING_CYCLE_SECONDS) * 100;
+  const {showRewarded} = useCASRewarded({
+    onReward: () => {
+      setAdLoading(false);
+      if (!claimMut.isPending) {
+        claimMut.mutate(true);
+      }
+    },
+    onFail: () => {
+      setAdLoading(false);
+      setResumeClaimTimer(n => n + 1);
+      setClaimHint(t('chart_game_ad_unavailable'));
+    },
+  });
+
+  const goPools = () => {
+    nav.getParent()?.navigate('Pools', {screen: 'PoolsList'});
+  };
+
+  const handlePress = () => {
+    if (claimMut.isPending) {
+      return;
+    }
+    setClaimHint(null);
+    if (canClaim) {
+      setClaimModalOpen(true);
+      return;
+    }
+    goPools();
+  };
+
+  const handleClaimRegular = () => {
+    if (claimMut.isPending) {
+      return;
+    }
+    claimMut.mutate(false);
+  };
+
+  const handleGetX2 = () => {
+    if (claimMut.isPending || adLoading) {
+      return;
+    }
+    setAdLoading(true);
+    showRewarded();
+    setTimeout(() => setAdLoading(false), 5000);
+  };
+
+  const msUntilClaim = cooldownUntilIso
+    ? Math.max(0, new Date(cooldownUntilIso).getTime() - displayNow)
+    : getFarmingCooldownRemainingMs(lastClaimAt, displayNow);
+
+  const percentagePassed = getFarmingBullcoinFillPercent(
+    lastClaimAt,
+    estimatedUnclaimed,
+    displayNow,
+  );
+
+  const timerHours = Math.floor(msUntilClaim / 3600000);
+  const timerMinutes = Math.floor((msUntilClaim % 3600000) / 60000);
 
   const buttonLabel = useMemo(() => {
-    if (!userData?.claim) {
-      return t('Start');
-    }
     if (claimMut.isPending) {
-      return `${t('Claiming...')}`;
+      return t('Claiming...');
     }
-    return t('Claim');
-  }, [userData?.claim, claimMut.isPending, t]);
+    if (canClaim) {
+      return t('Claim');
+    }
+    if (summary && hasPoolPositions(summary.byPool.length)) {
+      return t('farming_go_pools');
+    }
+    return t('Start');
+  }, [canClaim, claimMut.isPending, summary, t]);
 
-  if (!isInitialized) {
+  if (!token) {
+    return (
+      <View style={styles.miningRoot}>
+        <TouchableOpacity style={styles.startBtn} onPress={goPools}>
+          <Text style={styles.startBtnText}>{t('Start')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (summaryQuery.isPending) {
     return (
       <View style={styles.miningRoot}>
         <View style={styles.startBtnPlaceholder}>
@@ -228,22 +236,49 @@ export function MiningBlock() {
     );
   }
 
+  if (summaryQuery.isError) {
+    return (
+      <View style={styles.miningRoot}>
+        <Text style={styles.hintErr}>{formatApiError(summaryQuery.error)}</Text>
+        <TouchableOpacity
+          style={styles.startBtn}
+          onPress={() => summaryQuery.refetch()}>
+          <Text style={styles.startBtnText}>{t('Retry')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.miningRoot}>
-      {isMining ? (
+      <View style={styles.profitRow}>
+        <Text style={styles.profitLabel}>{t('Profit Per Hour')}:</Text>
+        <View style={styles.profitValueRow}>
+          <BalanceCoinIcon size={12} />
+          <Text style={styles.profitValue}>{profitPerHourDisplay}</Text>
+        </View>
+      </View>
+      {showTimer ? (
         <View style={styles.timerBox}>
           <View style={styles.timerProgressBar} pointerEvents="none">
             <View
               style={[
                 styles.timerProgressBarFill,
-                {width: `${Math.min(100, Math.max(0, percentagePassed))}%`},
+                {
+                  width: `${Math.min(100, Math.max(0, percentagePassed))}%`,
+                },
               ]}
             />
           </View>
           <View style={styles.timerCol}>
-            <Text style={styles.timerProfit} numberOfLines={1}>
-              {localeFormat(profit)}
-            </Text>
+            <View style={styles.timerProfitRow}>
+              <BalanceCoinIcon size={12} />
+              <Text style={styles.timerProfit} numberOfLines={1}>
+                {earnedLinear != null
+                  ? formatLinearEarnedDisplay(earnedLinear)
+                  : formatPoolBigIntForDisplay(estimatedUnclaimed)}
+              </Text>
+            </View>
           </View>
           <View style={[styles.timerCol, styles.timerColCenter]}>
             <Text style={styles.timerText} numberOfLines={1}>
@@ -252,18 +287,17 @@ export function MiningBlock() {
           </View>
           <View style={[styles.timerCol, styles.timerColLast]}>
             <Text style={styles.timerTime} numberOfLines={1}>
-              {hours}
-              {t('h')} {minutes}
+              {timerHours}
+              {t('h')} {timerMinutes}
               {t('m')}
             </Text>
           </View>
         </View>
       ) : (
-        <Animated.View
-          style={[styles.startBtnWrap, {opacity: buttonOpacity}]}>
+        <Animated.View style={[styles.startBtnWrap, {opacity: buttonOpacity}]}>
           <TouchableOpacity
             style={styles.startBtn}
-            onPress={handleStartMining}
+            onPress={handlePress}
             disabled={claimMut.isPending || !showButton}
             activeOpacity={0.5}>
             {claimMut.isPending ? (
@@ -274,160 +308,17 @@ export function MiningBlock() {
           </TouchableOpacity>
         </Animated.View>
       )}
-
-      {/* Claim x2 modal */}
-      <AppModal
-        visible={modalClaimOpen}
-        onClose={simpleCloseClaim}
-        variant="center"
-        animationType="fade">
-        <AppModalClose onPress={simpleCloseClaim} color={colors.textMuted} />
-            <Text style={styles.modalTitle}>
-              {t('You can claim x2 of your points')}
-            </Text>
-            <Text style={styles.modalDesc}>
-              {t('look the ad')}
-              {'\n'}
-              {t('Reward points add to your XP and increase your level')}
-            </Text>
-            <View style={styles.modalInfo}>
-              <Text style={styles.modalInfoLabel}>{t('Reward')}:</Text>
-              <View style={styles.modalPriceRow}>
-                <Text style={styles.modalPriceOld}>
-                  {sumFormat(calculateCoinsEarned())}
-                </Text>
-                <View style={styles.modalCoinRow}>
-                  <PointCoinIcon size={16} />
-                  <Text style={styles.modalPriceNew}>
-                    {sumFormat(calculateCoinsEarned() * 2)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-            {claimAdUnavailable ? (
-              <Text style={styles.modalAdHint}>{t('Ad not found')}</Text>
-            ) : null}
-            <TouchableOpacity
-              style={styles.modalBtnGray}
-              onPress={() => {
-                setClaimAdUnavailable(false);
-                setStopClaimTimer(true);
-                setAdLoading(true);
-                showRewarded();
-                setTimeout(() => setAdLoading(false), 5000);
-              }}>
-              {adLoading ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <>
-                  <VideoIcon size={18} color={colors.textPrimary} />
-                  <Text style={styles.modalBtnGrayText}>
-                    {t('Get X2')}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalBtnPrimary, styles.modalBtnClaimBase]}
-              onPress={claimWithoutAd}
-              disabled={claimMut.isPending}
-              activeOpacity={0.85}>
-              {claimMut.isPending ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <Text style={styles.modalBtnPrimaryText}>{t('Claim')}</Text>
-              )}
-            </TouchableOpacity>
-            <TimerBar
-              key={claimModalKey}
-              stopTimer={stopClaimTimer}
-              onComplete={simpleCloseClaim}
-            />
-      </AppModal>
-
-      <AppModal
-        visible={modalNextStageOpen}
-        onClose={simpleCloseNextStage}
-        variant="center"
-        animationType="fade">
-        <AppModalClose onPress={simpleCloseNextStage} color={colors.textMuted} />
-            <Text style={styles.modalTitle}>{t('Pay attention!')}</Text>
-            <Text style={styles.modalDesc}>
-              {t('Spins reset after each point claim.')}
-            </Text>
-            <TouchableOpacity
-              style={styles.modalBtnPrimary}
-              onPress={() => {
-                setModalNextStageOpen(false);
-                nav.navigate('Roulette');
-              }}>
-              <Text style={styles.modalBtnPrimaryText}>
-                {t('Go to roulette')}
-              </Text>
-            </TouchableOpacity>
-      </AppModal>
-
-      <AppModal
-        visible={modalBannerNotFound}
-        onClose={() => setModalBannerNotFound(false)}
-        variant="center"
-        animationType="fade">
-        <AppModalClose
-          onPress={() => setModalBannerNotFound(false)}
-          color={colors.textMuted}
-        />
-            <Text style={styles.modalTitle}>{t('Pay attention!')}</Text>
-            <Text style={styles.modalDesc}>{t('Ad not found')}</Text>
-            <TouchableOpacity
-              style={styles.modalBtnPrimary}
-              onPress={() => setModalBannerNotFound(false)}>
-              <Text style={styles.modalBtnPrimaryText}>OK</Text>
-            </TouchableOpacity>
-      </AppModal>
-    </View>
-  );
-}
-
-function TimerBar({
-  onComplete,
-  stopTimer,
-}: {
-  onComplete: () => void;
-  stopTimer: boolean;
-}) {
-  const [secs, setSecs] = useState(5);
-  const [fill, setFill] = useState(100);
-  const ref = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (stopTimer && ref.current) {
-      clearInterval(ref.current);
-      return;
-    }
-    ref.current = setInterval(() => {
-      setSecs(p => (p > 0 ? p - 0.1 : 0));
-      setFill(p => (p > 0 ? p - 2 : 0));
-    }, 100);
-    return () => {
-      if (ref.current) {
-        clearInterval(ref.current);
-      }
-    };
-  }, [stopTimer]);
-
-  useEffect(() => {
-    if (secs <= 0) {
-      if (ref.current) {
-        clearInterval(ref.current);
-      }
-      onComplete();
-    }
-  }, [secs, onComplete]);
-
-  return (
-    <View style={styles.timerBarOuter}>
-      <View style={[styles.timerBarFill, {width: `${fill}%`}]} />
-      <Text style={styles.timerBarLabel}>0:0{Math.ceil(secs)}</Text>
+      {claimHint ? <Text style={styles.hintErr}>{claimHint}</Text> : null}
+      <FarmingClaimX2Modal
+        visible={claimModalOpen}
+        onClose={() => setClaimModalOpen(false)}
+        baseReward={estimatedUnclaimed}
+        onClaimRegular={handleClaimRegular}
+        onGetX2={handleGetX2}
+        claimPending={claimMut.isPending}
+        adLoading={adLoading}
+        resumeTimerSignal={resumeClaimTimer}
+      />
     </View>
   );
 }
@@ -437,7 +328,33 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'stretch',
   },
-  /** `.timer-box` — App.css */
+  profitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  profitLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    fontFamily: fontFamily.semibold,
+    textTransform: 'capitalize',
+    fontStyle: 'italic',
+  },
+  profitValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  profitValue: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    fontFamily: fontFamily.semibold,
+    textTransform: 'capitalize',
+  },
   timerBox: {
     width: '100%',
     flexDirection: 'row',
@@ -450,7 +367,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(230, 33, 89, 0.16)',
     overflow: 'hidden',
   },
-  /** `.progress-bar` — слой под текстом */
   timerProgressBar: {
     position: 'absolute',
     left: 0,
@@ -462,13 +378,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     zIndex: 0,
   },
-  /** `.progress-bar-fill` */
   timerProgressBarFill: {
     height: '100%',
     borderRadius: WEB_TIMER_BORDER_RADIUS_PX,
     backgroundColor: 'rgba(230, 33, 89, 0.08)',
   },
-  /** `.timer-box > div` — три колонки поверх бара */
   timerCol: {
     flex: 1,
     zIndex: 2,
@@ -479,19 +393,23 @@ const styles = StyleSheet.create({
   timerColCenter: {
     alignItems: 'center',
   },
-  /** `.timer-box div:last-child` */
   timerColLast: {
     alignItems: 'flex-end',
   },
-  /** базовый текст `.timer-box` + `.timer-profit` */
+  timerProfitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: '100%',
+  },
   timerProfit: {
     fontSize: 14,
     fontWeight: '600',
     color: 'rgba(126, 50, 71, 1)',
     fontFamily: fontFamily.semibold,
     textAlign: 'left',
+    flexShrink: 1,
   },
-  /** `.timer-text` — процент */
   timerText: {
     fontSize: 16,
     fontWeight: '600',
@@ -533,112 +451,11 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     fontFamily: fontFamily.semibold,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 12,
-    fontFamily: fontFamily.bold,
-  },
-  modalDesc: {
-    fontSize: 14,
-    color: colors.textMuted,
-    marginBottom: 16,
-    lineHeight: 20,
-    fontFamily: fontFamily.regular,
-  },
-  modalInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalInfoLabel: {
-    fontSize: 14,
-    color: colors.textMuted,
-    fontFamily: fontFamily.regular,
-  },
-  modalPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  modalCoinRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  modalPriceOld: {
-    fontSize: 12,
-    color: colors.textMuted,
-    textDecorationLine: 'line-through',
-    fontFamily: fontFamily.regular,
-  },
-  modalPriceNew: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    fontFamily: fontFamily.bold,
-  },
-  modalBtnGray: {
-    backgroundColor: colors.tabPillActive,
-    borderRadius: radii.pill,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  modalBtnGrayText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: fontFamily.semibold,
-  },
-  modalBtnPrimary: {
-    backgroundColor: colors.primary,
-    borderRadius: radii.pill,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalBtnClaimBase: {
-    marginTop: 10,
-  },
-  modalAdHint: {
+  hintErr: {
+    marginTop: 8,
+    color: colors.error,
     fontSize: 13,
-    color: colors.primary,
-    marginBottom: 8,
     textAlign: 'center',
     fontFamily: fontFamily.regular,
-  },
-  modalBtnPrimaryText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: fontFamily.semibold,
-  },
-  timerBarOuter: {
-    height: 8,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginTop: 12,
-    width: 240,
-    alignSelf: 'center',
-    overflow: 'hidden',
-  },
-  timerBarFill: {
-    height: '100%',
-    borderRadius: radii.pill,
-    backgroundColor: colors.primary,
-  },
-  timerBarLabel: {
-    marginTop: 4,
-    textAlign: 'center',
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    fontFamily: fontFamily.semibold,
   },
 });

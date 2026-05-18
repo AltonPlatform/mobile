@@ -21,30 +21,12 @@ import {colors, radii, space} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
 import type {PoolsByPoolRow} from '../types/pools';
 import type {PoolsStackParamList} from '../navigation/MainTabs';
-
-const CLAIM_COOLDOWN_MS = 6 * 60 * 60 * 1000;
-
-function nextClaimAtFromSummary(lastFarmingClaimAt: string | null): string | null {
-  if (!lastFarmingClaimAt) {
-    return null;
-  }
-  const t0 = new Date(lastFarmingClaimAt).getTime();
-  if (!Number.isFinite(t0)) {
-    return null;
-  }
-  return new Date(t0 + CLAIM_COOLDOWN_MS).toISOString();
-}
-
-function formatCountdown(ms: number): string {
-  if (ms <= 0) {
-    return '0:00:00';
-  }
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
+import {formatPoolBigInt} from '../utils/poolFormat';
+import {
+  formatFarmingCountdown,
+  nextClaimAtFromSummary,
+  resolveTotalRewardPerHour,
+} from '../utils/poolFarmingCycle';
 
 export function PoolsSummaryScreen() {
   const {t} = useTranslation();
@@ -195,6 +177,10 @@ export function PoolsSummaryScreen() {
               label={t('farming_profit_estimate')}
               value={summary.totalFarmingProfitEstimate}
             />
+            <Row
+              label={t('Profit Per Hour')}
+              value={formatPoolBigInt(resolveTotalRewardPerHour(summary))}
+            />
             <MutedText style={styles.lastClaim}>
               lastFarmingClaimAt:{' '}
               {summary.lastFarmingClaimAt
@@ -204,7 +190,7 @@ export function PoolsSummaryScreen() {
             {onCooldown ? (
               <Text style={styles.cooldown}>
                 {t('farming_claim_available_in', {
-                  time: formatCountdown(msUntilClaim),
+                  time: formatFarmingCountdown(msUntilClaim),
                 })}
               </Text>
             ) : (

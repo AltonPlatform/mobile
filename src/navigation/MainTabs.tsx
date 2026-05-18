@@ -16,9 +16,9 @@ import {HomeScreen} from '../screens/HomeScreen';
 import {useUserContext} from '../context/UserContext';
 import {colors} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
-import {RouletteScreen} from '../screens/RouletteScreen';
 import {ChartGameScreen} from '../screens/ChartGameScreen';
 import {MiningClickScreen} from '../screens/MiningClickScreen';
+import {BrandPadScreen} from '../screens/BrandPadScreen';
 import {PoolsListScreen} from '../screens/PoolsListScreen';
 import {PoolDetailScreen} from '../screens/PoolDetailScreen';
 import {PoolsSummaryScreen} from '../screens/PoolsSummaryScreen';
@@ -31,9 +31,9 @@ import {WalletScreen} from '../screens/WalletScreen';
 
 export type HomeStackParamList = {
   HomeMain: undefined;
-  Roulette: undefined;
   ChartGame: undefined;
   MiningClick: undefined;
+  BrandPad: {brandpadId?: string} | undefined;
   Wallet: undefined;
 };
 
@@ -83,11 +83,6 @@ function HomeStackNav() {
       }}>
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
       <HomeStack.Screen
-        name="Roulette"
-        component={RouletteScreen}
-        options={{headerShown: false}}
-      />
-      <HomeStack.Screen
         name="ChartGame"
         component={ChartGameScreen}
         options={{headerShown: false}}
@@ -96,6 +91,11 @@ function HomeStackNav() {
         name="MiningClick"
         component={MiningClickScreen}
         options={{headerShown: false}}
+      />
+      <HomeStack.Screen
+        name="BrandPad"
+        component={BrandPadScreen}
+        options={{headerShown: true, title: 'BrandPad'}}
       />
       <HomeStack.Screen
         name="Wallet"

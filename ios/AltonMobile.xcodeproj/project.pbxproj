@@ -210,6 +210,7 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "AltonMobile" */;
 			buildPhases = (
 				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
+				65A69BC67A94519D21B02088 /* [CP-User] [CAS.AI] Configuration */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
@@ -323,6 +324,18 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-AltonMobile/Pods-AltonMobile-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		65A69BC67A94519D21B02088 /* [CP-User] [CAS.AI] Configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "[CP-User] [CAS.AI] Configuration";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\ncd \"${SRCROOT}\"\nexport BUNDLE_GEMFILE=\"${SRCROOT}/Gemfile\"\n\"${SRCROOT}/Scripts/run_cas_configuration.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		A55EABD7B0C7F3A422A6CC61 /* [CP] Check Pods Manifest.lock */ = {
@@ -515,7 +528,7 @@
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = AltonMobile/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.educational-games";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -549,7 +562,7 @@
 				DEVELOPMENT_TEAM = X6GV877JLH;
 				INFOPLIST_FILE = AltonMobile/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.educational-games";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

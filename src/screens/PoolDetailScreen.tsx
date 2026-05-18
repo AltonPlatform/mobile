@@ -29,6 +29,10 @@ import {PoolTradePanel} from '../components/PoolTradePanel';
 import {colors, radii, space} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
 import type {PoolsStackParamList} from '../navigation/MainTabs';
+import {
+  formatPoolBigInt,
+  formatPoolSpot,
+} from '../utils/poolFormat';
 
 export function PoolDetailScreen() {
   const {t} = useTranslation();
@@ -150,9 +154,15 @@ export function PoolDetailScreen() {
     return (
       <View style={styles.block}>
         <Text style={styles.sectionTitle}>{t('farming_your_position')}</Text>
-        <Row label={t('farming_tokens')} value={me.amount} />
-        <Row label={t('farming_stored_rewards')} value={me.storedRewards} />
-        <Row label={t('farming_points_spent')} value={me.totalPointsSpent} />
+        <Row label={t('farming_tokens')} value={formatPoolBigInt(me.amount)} />
+        <Row
+          label={t('farming_stored_rewards')}
+          value={formatPoolBigInt(me.storedRewards)}
+        />
+        <Row
+          label={t('farming_points_spent')}
+          value={formatPoolBigInt(me.totalPointsSpent)}
+        />
         <MutedText style={styles.monoSmall}>
           lastRewardUpdate:{' '}
           {me.lastRewardUpdate
@@ -202,18 +212,30 @@ export function PoolDetailScreen() {
           {pool.description ? (
             <MutedText style={styles.desc}>{pool.description}</MutedText>
           ) : null}
-          <Row label={t('farming_reserves_points')} value={pool.reservePoints} />
-          <Row label={t('farming_reserves_tokens')} value={pool.reserveTokens} />
-          <Row label={t('farming_total_held')} value={pool.totalUserHeldTokens} />
-          <Row label={t('farming_max_supply')} value={pool.maxSupply} />
+          <Row
+            label={t('farming_reserves_points')}
+            value={formatPoolBigInt(pool.reservePoints)}
+          />
+          <Row
+            label={t('farming_reserves_tokens')}
+            value={formatPoolBigInt(pool.reserveTokens)}
+          />
+          <Row
+            label={t('farming_total_held')}
+            value={formatPoolBigInt(pool.totalUserHeldTokens)}
+          />
+          <Row
+            label={t('farming_max_supply')}
+            value={formatPoolBigInt(pool.maxSupply)}
+          />
           <Row
             label={t('farming_emission_hour')}
-            value={String(pool.emissionPerHour)}
+            value={formatPoolBigInt(String(pool.emissionPerHour))}
           />
-          <Row label={t('farming_spot')} value={pool.spotPriceApprox} />
+          <Row label={t('farming_spot')} value={formatPoolSpot(pool.spotPriceApprox)} />
           <Row
             label={t('farming_volume_24h')}
-            value={volume24h ?? '—'}
+            value={volume24h ? formatPoolBigInt(volume24h) : '—'}
           />
         </View>
 

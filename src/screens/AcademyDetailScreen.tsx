@@ -28,7 +28,7 @@ import {
 } from '../components/Icons';
 import {api} from '../api/client';
 import type {AcademyStackParamList} from '../navigation/MainTabs';
-import {useAppodealRewarded} from '../hooks/useAppodeal';
+import {useCASRewarded} from '../hooks/useCASRewarded';
 import {useUserContext} from '../context/UserContext';
 import {AppModal, AppModalClose, Screen} from '../components/ui';
 import {colors, radii} from '../theme/tokens';
@@ -233,7 +233,7 @@ export function AcademyDetailScreen() {
     ],
   );
 
-  const {showRewarded} = useAppodealRewarded({
+  const {showRewarded} = useCASRewarded({
     onReward: () => executeExam({withAd: true}),
     onFail: () => setAdModal(true),
   });

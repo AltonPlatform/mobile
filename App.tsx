@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React from 'react';
 import {StatusBar} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
@@ -10,8 +10,8 @@ import {AppNavigationTheme} from './src/theme/navigationTheme';
 import {colors} from './src/theme/tokens';
 import {UserProvider} from './src/context/UserContext';
 import {RootNavigator} from './src/navigation/RootNavigator';
-import {APPODEAL_APP_KEY} from './src/config';
 import {TonConnectProvider} from './src/tonconnect/provider/TonConnectProvider';
+import {useCASInit} from './src/hooks/useCASInit';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,27 +19,8 @@ const queryClient = new QueryClient({
   },
 });
 
-function AppodealInit() {
-  useEffect(() => {
-    if (!APPODEAL_APP_KEY || APPODEAL_APP_KEY.startsWith('YOUR_')) {
-      if (__DEV__) {
-        console.warn('[Appodeal] Set APPODEAL_APP_KEY in src/config.ts');
-      }
-      return;
-    }
-    try {
-      const Appodeal = require('react-native-appodeal').default;
-      const {AppodealAdType} = require('react-native-appodeal');
-      Appodeal.initialize(APPODEAL_APP_KEY, AppodealAdType.REWARDED_VIDEO);
-      if (__DEV__) {
-        Appodeal.setTesting?.(true);
-      }
-    } catch (e) {
-      if (__DEV__) {
-        console.warn('[Appodeal] Native module unavailable:', e);
-      }
-    }
-  }, []);
+function CASInit() {
+  useCASInit();
   return null;
 }
 
@@ -50,7 +31,7 @@ function App() {
         <SafeAreaProvider style={{flex: 1, backgroundColor: colors.bg}}>
           <UserProvider>
             <TonConnectProvider>
-              <AppodealInit />
+              <CASInit />
               <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
               <NavigationContainer ref={navigationRef} theme={AppNavigationTheme}>
                 <RootNavigator />

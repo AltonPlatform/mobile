@@ -1,10 +1,5 @@
-# Appodeal / Stack: spec repos (git). Order: private specs first so Appodeal resolves from git, not only trunk.
-# CDN trunk (jsdelivr) can fail with "HTTP2 framing layer" during `pod install --repo-update` — avoid blanket
-# `--repo-update`. Use: `bundle exec pod install` (default does not refresh all spec repos).
-# If you only need newer Appodeal/Bidon specs: `pod repo update appodeal-cocoapods bidon-io-cocoapods-specs`
-source 'https://github.com/appodeal/CocoaPods.git'
-source 'https://github.com/bidon-io/CocoaPods-Specs.git'
-source 'https://cdn.cocoapods.org/'
+source 'https://github.com/CocoaPods/Specs.git'
+source 'https://github.com/cleveradssolutions/CAS-Specs.git'
 
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
@@ -78,6 +73,23 @@ target 'AltonMobile' do
           bc.build_settings['OTHER_LDFLAGS'] = flags
         end
       end
+      # CAS.AI Configuration: bundle exec ruby (xcodeproj from Gemfile), not system Ruby.
+      xcodeproj.native_targets.each do |native_target|
+        next unless native_target.name == 'AltonMobile'
+
+        native_target.shell_script_build_phases.each do |phase|
+          next unless phase.name == '[CP-User] [CAS.AI] Configuration'
+
+          phase.shell_path = '/bin/sh'
+          phase.shell_script = <<~SCRIPT
+            set -e
+            cd "${SRCROOT}"
+            export BUNDLE_GEMFILE="${SRCROOT}/Gemfile"
+            "${SRCROOT}/Scripts/run_cas_configuration.sh"
+          SCRIPT
+        end
+      end
+
       xcodeproj.save
     end
   end

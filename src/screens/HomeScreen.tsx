@@ -13,10 +13,13 @@ import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useMutation, useQuery} from '@tanstack/react-query';
+import {usePoolsSummaryLive} from '../hooks/usePoolsSummaryLive';
+import {fetchActiveBrandPad} from '../api/brandpad';
 
 import {UserProfileHeader} from '../components/UserProfileHeader';
-import {FarmingHomeClaim} from '../components/FarmingHomeClaim';
+import {MiningBlock} from '../components/MiningBlock';
 import {ComboBlock} from '../components/ComboBlock';
+import {BullcoinFilledGlow} from '../components/BullcoinFilledGlow';
 import {BullcoinLiquidFill} from '../components/BullcoinLiquidFill';
 import {useUserContext} from '../context/UserContext';
 import {api} from '../api/client';
@@ -25,16 +28,18 @@ import {AppModal, AppModalClose} from '../components/ui';
 import {colors, radii} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
 import {isToday, isYesterday, countDays, sumFormat} from '../utils/fortune';
-import {getMiningCycleFillPercent} from '../utils/miningProfit';
+import {
+  getFarmingBullcoinFillPercent,
+  isFarmingClaimReady,
+} from '../utils/poolFarmingCycle';
 import {formatTonFriendlyShort} from '../utils/walletDisplay';
 import {useTonConnect} from '../hooks/useTonConnect';
+import {useSyncWalletWithBackend} from '../hooks/useSyncWalletWithBackend';
 import {
   TicketIcon,
   PointCoinIcon,
   BalanceCoinIcon,
-  DiamondIcon,
   BullcoinIcon,
-  ClockIcon,
 } from '../components/Icons';
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 /** animation.css `.bullcoin` — width/height: 25vh; на узких экранах ограничиваем шириной */
@@ -42,38 +47,27 @@ const COIN_SIZE = Math.round(
   Math.min(SCREEN_HEIGHT * 0.25, SCREEN_WIDTH * 0.92),
 );
 
-function localeFormat(n: number) {
-  try {
-    return Math.floor(n).toLocaleString(undefined, {maximumFractionDigits: 0});
-  } catch {
-    return String(Math.floor(n));
-  }
-}
-
 export function HomeScreen() {
   const {t} = useTranslation();
   const nav = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const insets = useSafeAreaInsets();
-  const {userData, refetchUser} = useUserContext();
-  const {walletAccount, connected, restoring, pickerBusy, connect} = useTonConnect();
+  const {userData, refetchUser, token} = useUserContext();
+  const {walletAccount, connected, restoring, pickerBusy, connect, disconnect} =
+    useTonConnect();
 
   const coinFade = useRef(new Animated.Value(0)).current;
 
-  // ── Mining percentage for liquid fill ──
-  const [percentage, setPercentage] = useState(0);
-  const claimDate = useMemo(() => {
-    return userData && typeof userData.claim === 'string'
-      ? userData.claim
-      : null;
-  }, [userData]);
+  const poolsSummaryQuery = usePoolsSummaryLive(!!token);
+  const lastFarmingClaimAt =
+    poolsSummaryQuery.data?.lastFarmingClaimAt ?? null;
+  const totalUnclaimed = poolsSummaryQuery.estimatedUnclaimed;
 
-  useEffect(() => {
-    const calc = () =>
-      claimDate ? getMiningCycleFillPercent(claimDate) : 0;
-    setPercentage(calc());
-    const iv = setInterval(() => setPercentage(calc()), 100);
-    return () => clearInterval(iv);
-  }, [claimDate]);
+  // ── Bullcoin fill: 0→100 за cooldown; 100% + glow когда claim готов (как TWA) ──
+  const percentage = getFarmingBullcoinFillPercent(
+    lastFarmingClaimAt,
+    totalUnclaimed,
+    poolsSummaryQuery.displayNowMs,
+  );
 
   useEffect(() => {
     coinFade.setValue(0);
@@ -82,11 +76,7 @@ export function HomeScreen() {
       duration: 1000,
       useNativeDriver: true,
     }).start();
-  }, [claimDate, coinFade]);
-
-  // ── Fortune / Spins ──
-  const fortune =
-    userData && typeof userData.fortune === 'number' ? userData.fortune : 0;
+  }, [lastFarmingClaimAt, coinFade]);
 
   const chartTickets =
     userData && typeof userData.chartTickets === 'number'
@@ -98,22 +88,26 @@ export function HomeScreen() {
       ? userData.miningTickets
       : 0;
 
-  const miningSpeed =
-    typeof userData?.miningSpeed === 'number' ? userData.miningSpeed : 0;
+  const activeBrandpadQuery = useQuery({
+    queryKey: ['brandpad', 'active'],
+    queryFn: fetchActiveBrandPad,
+    staleTime: 60_000,
+  });
+  const activeBrandpad = activeBrandpadQuery.data;
 
-  const coinFilled = percentage >= 100;
+  const claimReady = isFarmingClaimReady(lastFarmingClaimAt, totalUnclaimed);
+  const coinFilled = claimReady;
 
   // ── Daily bonus modal ──
   const [dailyBonusOpen, setDailyBonusOpen] = useState(false);
   const [dailyReward, setDailyReward] = useState<{
     point?: number;
     balance?: number;
-    fortuneSpin?: number;
   } | null>(null);
 
   const dailyBonusMut = useMutation({
     mutationFn: async () => {
-      const {data} = await api.post('/api/users/daily-bonus');
+      const {data} = await api.post('/api/users/daily');
       return data;
     },
     onSuccess: () => refetchUser(),
@@ -193,36 +187,12 @@ export function HomeScreen() {
 
   const closeMissionModal = () => setMissionModalOpen(false);
 
-  const saveWalletMut = useMutation({
-    mutationFn: async (payload: {address: string; publicKey: string}) => {
-      await api.post('/api/users/wallet', payload);
-    },
-    onSuccess: () => {
-      refetchUser();
-    },
+  useSyncWalletWithBackend({
+    walletAccount,
+    userWallet: userData?.wallet,
+    refetchUser,
+    disconnect,
   });
-
-  useEffect(() => {
-    const address = walletAccount?.address ?? '';
-    const publicKey = walletAccount?.publicKey ?? '';
-    if (!address || saveWalletMut.isPending) {
-      return;
-    }
-    const currentAddress =
-      typeof userData?.wallet?.address === 'string' ? userData.wallet.address : '';
-    const currentKey =
-      typeof userData?.wallet?.publicKey === 'string' ? userData.wallet.publicKey : '';
-    if (address === currentAddress && publicKey === currentKey) {
-      return;
-    }
-    saveWalletMut.mutate({address, publicKey});
-  }, [
-    walletAccount?.address,
-    walletAccount?.publicKey,
-    userData?.wallet?.address,
-    userData?.wallet?.publicKey,
-    saveWalletMut,
-  ]);
 
   /** Mirrors web `UserProfile.handleWalletConnect`: connect in place vs navigate to Wallet when already linked. */
   const handleWalletPress = async () => {
@@ -277,77 +247,46 @@ export function HomeScreen() {
           <Animated.View
             style={[styles.bullcoinFade, {opacity: coinFade}]}
             pointerEvents="box-none">
-            <View
-              style={[
-                styles.bullcoin,
-                {
-                  width: COIN_SIZE,
-                  height: COIN_SIZE,
-                  borderRadius: COIN_SIZE / 2,
-                },
-                coinFilled && styles.bullcoinFilled,
-              ]}>
-              <View style={styles.bullcoinGraphic}>
-                <BullcoinIcon size={COIN_SIZE} />
+            <BullcoinFilledGlow size={COIN_SIZE} active={coinFilled}>
+              <View
+                style={[
+                  styles.bullcoin,
+                  {
+                    width: COIN_SIZE,
+                    height: COIN_SIZE,
+                    borderRadius: COIN_SIZE / 2,
+                  },
+                ]}>
+                <View style={styles.bullcoinGraphic}>
+                  <BullcoinIcon size={COIN_SIZE} />
+                </View>
+                <BullcoinLiquidFill size={COIN_SIZE} percentage={percentage} />
               </View>
-              <BullcoinLiquidFill size={COIN_SIZE} percentage={percentage} />
-            </View>
+            </BullcoinFilledGlow>
           </Animated.View>
         </View>
       </View>
 
-      {/* Profit per hour */}
-      <View style={styles.profitRow}>
-        <Text style={styles.profitLabel}>{t('Profit Per Hour')}:</Text>
-        <View style={styles.profitValueRow}>
-          <PointCoinIcon size={12} />
-          <Text style={styles.profitValue}>{localeFormat(miningSpeed)}</Text>
-        </View>
-      </View>
-
-      {/* Farming pools: claim + ссылка на пулы */}
+      {/* Farming pools: claim (Profit Per Hour внутри MiningBlock) */}
       <View style={styles.miningWrap}>
-        <FarmingHomeClaim />
+        <MiningBlock />
       </View>
 
       {/* Spacer pushes grid to bottom */}
       <View style={styles.spacer} />
 
-      {/* Grid: Roulette | Testnet */}
-      <View style={styles.grid}>
-        <TouchableOpacity
-          style={[styles.tile, styles.rouletteTile]}
-          onPress={() => nav.navigate('Roulette')}
-          activeOpacity={0.85}>
-          <View style={styles.rouletteContent}>
-            <View style={styles.rouletteTextCol}>
-              <Text style={styles.tileTitle}>{t('Roulette')}</Text>
-              <View style={styles.tileDescRow}>
-                <Text style={styles.tileDesc}>
-                  {fortune || 0}/20
-                </Text>
-                <TicketIcon size={14} color="#7976E7" />
-              </View>
-            </View>
-            <View style={styles.diamondWrap}>
-              <DiamondIcon size={32} />
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tile, styles.brandsTile, styles.testnetTile]}
-          onPress={() => nav.navigate('ChartGame')}
-          activeOpacity={0.85}>
-          <View style={styles.brandsTitleRow}>
-            <Text style={styles.tileTitle}>{t('chart_game_title')}</Text>
-            <TicketIcon size={14} color="#38bdf8" />
-          </View>
-          <View style={styles.tileDescRow}>
-            <Text style={styles.tileDesc}>{chartTickets || 0}/20</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[styles.tile, styles.chartGameTile]}
+        onPress={() => nav.navigate('ChartGame')}
+        activeOpacity={0.85}>
+        <View style={styles.brandsTitleRow}>
+          <Text style={styles.tileTitle}>{t('chart_game_title')}</Text>
+          <TicketIcon size={14} color="#38bdf8" />
+        </View>
+        <View style={styles.tileDescRow}>
+          <Text style={styles.tileDesc}>{chartTickets || 0}/20</Text>
+        </View>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.tile, styles.miningClickTile]}
@@ -360,6 +299,34 @@ export function HomeScreen() {
         <View style={styles.tileDescRow}>
           <Text style={styles.tileDesc}>{miningTickets || 0}/20</Text>
         </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.tile, styles.brandpadTile]}
+        onPress={() =>
+          nav.navigate('BrandPad', {
+            brandpadId: activeBrandpad?.id,
+          })
+        }
+        activeOpacity={0.85}>
+        <View style={styles.brandsTitleRow}>
+          <Text style={styles.tileTitle}>{t('brandpad_title')}</Text>
+          <TicketIcon size={14} color="#A855F7" />
+        </View>
+        <View style={styles.tileDescRow}>
+          <Text style={styles.tileDesc} numberOfLines={1}>
+            {activeBrandpad
+              ? activeBrandpad.name
+              : t('brandpad_no_active_short')}
+          </Text>
+        </View>
+        {activeBrandpad ? (
+          <Text style={styles.tileSub}>
+            {t('brandpad_tile_participants', {
+              count: activeBrandpad.participantCount,
+            })}
+          </Text>
+        ) : null}
       </TouchableOpacity>
 
       <AppModal
@@ -387,14 +354,6 @@ export function HomeScreen() {
                       <BalanceCoinIcon size={20} />
                       <Text style={styles.rewardItemText}>
                         {sumFormat(dailyReward.balance)}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {dailyReward.fortuneSpin ? (
-                    <View style={styles.rewardItem}>
-                      <TicketIcon size={16} color="#7976E7" />
-                      <Text style={styles.rewardItemText}>
-                        {sumFormat(dailyReward.fortuneSpin)}
                       </Text>
                     </View>
                   ) : null}
@@ -456,16 +415,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'stretch',
     paddingVertical: 20,
+    overflow: 'visible',
   },
   /** App.css `.home-container` */
   homeContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
+    overflow: 'visible',
   },
   /** animation.css `.bullcoin` — fadeIn задаётся через Animated */
   bullcoinFade: {
     backfaceVisibility: 'hidden',
+    overflow: 'visible',
   },
   /** animation.css `.bullcoin` */
   bullcoin: {
@@ -474,14 +436,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-  },
-  /** animation.css `.bullcoin.filled` — свечение как @keyframes glowing */
-  bullcoinFilled: {
-    shadowColor: '#e62159',
-    shadowOffset: {width: 0, height: 0},
-    shadowOpacity: 0.75,
-    shadowRadius: 18,
-    elevation: 18,
   },
   /** SVG монеты (аналог background-image на TWA) */
   bullcoinGraphic: {
@@ -493,48 +447,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  /* Profit per hour */
-  profitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  profitLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    fontFamily: fontFamily.semibold,
-    textTransform: 'capitalize',
-    fontStyle: 'italic',
-  },
-  profitValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  profitValue: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    fontFamily: fontFamily.semibold,
-    textTransform: 'capitalize',
-    fontStyle: 'normal',
-  },
-
   /* Mining wrap */
   miningWrap: {
     width: '100%',
     marginBottom: 16,
   },
 
-  /* Grid */
-  grid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
   tile: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,
@@ -543,29 +461,23 @@ const styles = StyleSheet.create({
     height: 80,
     justifyContent: 'center',
   },
-  rouletteTile: {
-    flex: 3,
-  },
-  brandsTile: {
-    flex: 1,
-  },
-  testnetTile: {
-    justifyContent: 'center',
+  chartGameTile: {
+    width: '100%',
   },
   miningClickTile: {
     marginTop: 8,
     width: '100%',
   },
-  rouletteContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  brandpadTile: {
+    marginTop: 8,
+    width: '100%',
+    minHeight: 72,
   },
-  rouletteTextCol: {
-    flex: 1,
-  },
-  diamondWrap: {
-    marginLeft: 8,
+  tileSub: {
+    fontSize: 10,
+    color: colors.textMuted,
+    fontFamily: fontFamily.regular,
+    marginTop: 4,
   },
   tileTitle: {
     fontSize: 13,

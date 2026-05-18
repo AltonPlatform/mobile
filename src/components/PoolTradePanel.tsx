@@ -15,6 +15,7 @@ import {
   sellOneTokenPriceDecimal,
   sellPointsOut,
 } from '../utils/poolAmm';
+import {formatPoolBigInt, formatPoolSpot} from '../utils/poolFormat';
 
 export type PoolTradeMode = 'buy' | 'sell';
 
@@ -30,7 +31,7 @@ type Props = {
 };
 
 function formatBigIntPlain(n: bigint): string {
-  return n.toString();
+  return formatPoolBigInt(n.toString());
 }
 
 /** Средняя цена: points / token (строка). */
@@ -218,15 +219,27 @@ export function PoolTradePanel({
       </View>
 
       <View style={styles.priceCard}>
-        <Row label={t('farming_trade_price_spot')} value={spotMid || spotPriceApprox} />
+        <Row
+          label={t('farming_trade_price_spot')}
+          value={formatPoolSpot(spotMid || spotPriceApprox)}
+        />
         {buyOnePrice ? (
-          <Row label={t('farming_trade_price_buy')} value={buyOnePrice} />
+          <Row
+            label={t('farming_trade_price_buy')}
+            value={formatPoolSpot(buyOnePrice)}
+          />
         ) : null}
         {sellOnePrice ? (
-          <Row label={t('farming_trade_price_sell')} value={sellOnePrice} />
+          <Row
+            label={t('farming_trade_price_sell')}
+            value={formatPoolSpot(sellOnePrice)}
+          />
         ) : null}
         {avgPrice ? (
-          <Row label={t('farming_trade_price_avg')} value={avgPrice} />
+          <Row
+            label={t('farming_trade_price_avg')}
+            value={formatPoolSpot(avgPrice)}
+          />
         ) : (
           <MutedRow text={t('farming_trade_price_avg_hint')} />
         )}

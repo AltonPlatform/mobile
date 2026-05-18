@@ -19,7 +19,7 @@ import {
 import {formatApiError} from '../api/errors';
 import {useGameLoop} from '../hooks/useGameLoop';
 import {useGameSession} from '../hooks/useGameSession';
-import {useAppodealRewarded} from '../hooks/useAppodeal';
+import {useCASRewarded} from '../hooks/useCASRewarded';
 import {useUserContext} from '../context/UserContext';
 import {maxRewardPreview} from '../utils/miningHashrate';
 import {PentagonBlocks} from '../components/miningClick/PentagonBlocks';
@@ -130,7 +130,7 @@ export function MiningClickScreen() {
     onError: (err: unknown) => Alert.alert(t('Error'), formatApiError(err)),
   });
 
-  const {showRewarded} = useAppodealRewarded({
+  const {showRewarded} = useCASRewarded({
     onReward: () => {
       game.grantAdAndResolve().catch((e: unknown) => {
         Alert.alert(t('Error'), formatApiError(e));

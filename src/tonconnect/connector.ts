@@ -1,6 +1,6 @@
 import {TonConnect} from '@tonconnect/sdk';
 
-import {TON_MANIFEST_URL} from '../config';
+import {TON_MANIFEST_URL, TON_WALLETS_LIST_URL} from '../config';
 import {createTonConnectAsyncStorage} from './storage';
 
 const storage = createTonConnectAsyncStorage();
@@ -20,6 +20,8 @@ export function getTonConnector(): TonConnect {
       storage: storage as never,
       disableAutoPauseConnection: true as never,
       analytics: {mode: 'off'} as never,
+      walletsListSource: TON_WALLETS_LIST_URL,
+      walletsListCacheTTLMs: 24 * 60 * 60 * 1000,
     });
   }
   return connector;

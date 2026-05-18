@@ -60,7 +60,7 @@ export function BullcoinIcon({
   );
 }
 
-/** Gold point coin — exact port of frontend point.svg */
+/** Gold points (XP / mining points) — frontend point.svg */
 export function PointCoinIcon({size = 16}: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
@@ -87,7 +87,7 @@ export function PointCoinIcon({size = 16}: IconProps) {
   );
 }
 
-/** Purple/blue coin — exact port of frontend coin.svg */
+/** Purple balance coin — frontend coin.svg; pool farming rewards */
 export function BalanceCoinIcon({size = 16}: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">

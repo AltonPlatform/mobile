@@ -25,6 +25,7 @@ import {Screen, MutedText} from '../components/ui';
 import {colors, radii, space} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
 import type {PoolsStackParamList} from '../navigation/MainTabs';
+import {formatPoolBigInt, formatPoolSpot} from '../utils/poolFormat';
 
 const SORT_OPTIONS: PoolsListSortBy[] = [
   'newest',
@@ -322,13 +323,14 @@ export function PoolsListScreen() {
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>{t('farming_spot')}</Text>
           <Text style={styles.cardValue} numberOfLines={1}>
-            {item.spotPriceApprox}
+            {formatPoolSpot(item.spotPriceApprox)}
           </Text>
         </View>
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>{t('farming_reserves')}</Text>
           <Text style={styles.cardValue} numberOfLines={1}>
-            P {item.reservePoints} / T {item.reserveTokens}
+            P {formatPoolBigInt(item.reservePoints)} / T{' '}
+            {formatPoolBigInt(item.reserveTokens)}
           </Text>
         </View>
       </TouchableOpacity>

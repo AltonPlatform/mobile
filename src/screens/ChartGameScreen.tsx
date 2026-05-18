@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, {FadeIn, FadeInDown} from 'react-native-reanimated';
 import {useMutation, useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 
@@ -25,7 +26,7 @@ import {formatApiError} from '../api/errors';
 import {CHART_GAME_TOTAL_SLOTS} from '../utils/chartGameLayout';
 import {ChartGamePriceChart} from '../components/ChartGamePriceChart';
 import {BalanceCoinIcon, TicketIcon} from '../components/Icons';
-import {useAppodealRewarded} from '../hooks/useAppodeal';
+import {useCASRewarded} from '../hooks/useCASRewarded';
 import {useUserContext} from '../context/UserContext';
 import {
   Card,
@@ -139,12 +140,12 @@ export function ChartGameScreen() {
     void configQ.refetch();
   }, [configQ]);
 
-  const {showRewarded: showRefundAd} = useAppodealRewarded({
+  const {showRewarded: showRefundAd} = useCASRewarded({
     onReward: () => refundMut.mutate(),
     onFail: () => Alert.alert(t('Error'), t('chart_game_ad_unavailable')),
   });
 
-  const {showRewarded: showRetryAd} = useAppodealRewarded({
+  const {showRewarded: showRetryAd} = useCASRewarded({
     onReward: () => {
       ticketMut.mutate(undefined, {
         onSuccess: () => {
@@ -162,8 +163,16 @@ export function ChartGameScreen() {
     if (revealStep >= reveal.revealCandles.length) {
       return;
     }
-    const id = setTimeout(() => setRevealStep(s => s + 1), 450);
+    const id = setTimeout(() => setRevealStep(s => s + 1), 520);
     return () => clearTimeout(id);
+  }, [phase, reveal, revealStep]);
+
+  const revealComplete = useMemo(() => {
+    if (phase !== 'result' || !reveal) {
+      return false;
+    }
+    const total = reveal.revealCandles?.length ?? 0;
+    return total === 0 || revealStep >= total;
   }, [phase, reveal, revealStep]);
 
   const visibleReveal = useMemo((): ChartCandle[] => {
@@ -287,13 +296,23 @@ export function ChartGameScreen() {
 
         {(phase === 'playing' || phase === 'result') && round ? (
           <>
-            <ChartGamePriceChart
-              candles={round.candles}
-              revealCandles={visibleReveal}
-              emptyLabel={t('chart_game_chart_empty')}
-              symbolLabel={symbolLabel}
-              totalSlots={CHART_GAME_TOTAL_SLOTS}
-            />
+            <Animated.View
+              key={
+                phase === 'result'
+                  ? `${round.roundId}-reveal`
+                  : `${round.roundId}-play`
+              }
+              entering={FadeIn.duration(420)}>
+              <ChartGamePriceChart
+                candles={round.candles}
+                revealCandles={phase === 'result' ? visibleReveal : []}
+                emptyLabel={t('chart_game_chart_empty')}
+                symbolLabel={symbolLabel}
+                totalSlots={CHART_GAME_TOTAL_SLOTS}
+                animateCandles={phase === 'result'}
+              />
+            </Animated.View>
+
             {phase === 'playing' ? (
               <>
                 <MutedText style={styles.predictHint}>
@@ -321,7 +340,14 @@ export function ChartGameScreen() {
               </>
             ) : null}
 
-            {phase === 'result' && reveal ? (
+            {phase === 'result' && reveal && !revealComplete ? (
+              <MutedText style={styles.revealHint}>
+                {t('chart_game_revealing')}
+              </MutedText>
+            ) : null}
+
+            {phase === 'result' && reveal && revealComplete ? (
+              <Animated.View entering={FadeInDown.duration(480).springify()}>
               <Card style={styles.resultCard}>
                 <Text
                   style={[
@@ -374,6 +400,7 @@ export function ChartGameScreen() {
                   style={styles.btn}
                 />
               </Card>
+              </Animated.View>
             ) : null}
           </>
         ) : null}
@@ -444,6 +471,7 @@ const styles = StyleSheet.create({
   },
   btn: {marginTop: space.sm},
   predictHint: {textAlign: 'center', marginVertical: space.md},
+  revealHint: {textAlign: 'center', marginTop: space.md, marginBottom: space.sm},
   predRow: {flexDirection: 'row', gap: 12},
   predBtn: {
     flex: 1,

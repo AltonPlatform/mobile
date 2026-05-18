@@ -1,8 +1,14 @@
 import {WalletAlreadyConnectedError} from '@tonconnect/sdk';
-import type {TonConnect, WalletInfoRemote} from '@tonconnect/sdk';
+import type {TonConnect, WalletInfo, WalletInfoRemote} from '@tonconnect/sdk';
 
 import {getTonConnector} from './connector';
+import {hasTonConnectStoredSession} from './storage';
 import {openTonConnectWalletLink} from './utils/openWalletLink';
+import {withTimeout} from './utils/withTimeout';
+import {FALLBACK_REMOTE_WALLETS} from './walletsFallback';
+
+const RESTORE_TIMEOUT_MS = 12_000;
+const WALLETS_FETCH_TIMEOUT_MS = 12_000;
 
 export function isWalletAlreadyConnectedError(err: unknown): boolean {
   if (err instanceof WalletAlreadyConnectedError) {
@@ -44,16 +50,54 @@ export class WalletService {
     return this.client.onStatusChange(listener);
   }
 
+  /** Прогрев кэша списка кошельков (restoreConnection внутри SDK тоже вызывает getWallets). */
+  async warmWalletsCache(): Promise<void> {
+    try {
+      await withTimeout(
+        this.client.getWallets(),
+        WALLETS_FETCH_TIMEOUT_MS,
+      );
+    } catch {
+      // SDK подставит FALLBACK; не блокируем запуск.
+    }
+  }
+
   async restore(): Promise<void> {
-    await this.client.restoreConnection().catch(() => undefined);
+    const hasSession = await hasTonConnectStoredSession();
+    if (!hasSession) {
+      return;
+    }
+
+    await this.warmWalletsCache();
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), RESTORE_TIMEOUT_MS);
+    try {
+      await this.client.restoreConnection({signal: controller.signal});
+    } catch {
+      // Сеть/bridge недоступны — не блокируем запуск приложения.
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async disconnect(): Promise<void> {
     await this.client.disconnect();
   }
 
-  async getWallets() {
-    return this.client.getWallets();
+  async getWallets(): Promise<WalletInfo[]> {
+    try {
+      const list = await withTimeout(
+        this.client.getWallets(),
+        WALLETS_FETCH_TIMEOUT_MS,
+      );
+      if (list.length > 0) {
+        return list;
+      }
+    } catch {
+      // ignore — см. fallback
+    }
+    return [...FALLBACK_REMOTE_WALLETS];
   }
 
   /**

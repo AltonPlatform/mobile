@@ -44,13 +44,13 @@ type ProfileUser = {
   points_spent?: number;
   balanceEarned?: number;
   balanceSpent?: number;
-  stats?: {weekActive?: number; spin_count?: number};
+  stats?: {weekActive?: number};
 };
 
 export function ProfileScreen() {
   const {t} = useTranslation();
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const {userData, logout} = useUserContext();
+  const {token, userData, logout} = useUserContext();
 
   const u = userData as ProfileUser | null;
 
@@ -85,6 +85,10 @@ export function ProfileScreen() {
     u?.last_name && /^[a-zA-ZА-Яа-яЁё]$/.test(u.last_name[0]!)
       ? u.last_name[0]
       : '';
+
+  if (!token) {
+    return null;
+  }
 
   return (
     <Screen safeTop>
@@ -187,19 +191,13 @@ export function ProfileScreen() {
                   : '—'
               }
             />
-            <StatCard
-              title={`${t('Spins completed')}:`}
-              value={
-                u?.stats?.spin_count != null
-                  ? String(u.stats.spin_count)
-                  : '—'
-              }
-            />
           </View>
 
           <PrimaryButton
             title={t('Log out', {defaultValue: 'Log out'})}
-            onPress={() => logout()}
+            onPress={() => {
+              void logout();
+            }}
           />
         </ScrollView>
       )}

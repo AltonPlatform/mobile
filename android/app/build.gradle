@@ -1,6 +1,13 @@
-apply plugin: "com.android.application"
-apply plugin: "org.jetbrains.kotlin.android"
-apply plugin: "com.facebook.react"
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("com.facebook.react")
+    id("com.cleveradssolutions.gradle-plugin") version "4.6.6"
+}
+
+cas {
+    includeOptimalAds = false
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
