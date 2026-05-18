@@ -12,7 +12,7 @@ import {useTranslation} from 'react-i18next';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useMutation, useQuery} from '@tanstack/react-query';
+import {useQuery} from '@tanstack/react-query';
 import {usePoolsSummaryLive} from '../hooks/usePoolsSummaryLive';
 import {fetchActiveBrandPad} from '../api/brandpad';
 
@@ -25,9 +25,10 @@ import {useUserContext} from '../context/UserContext';
 import {api} from '../api/client';
 import type {HomeStackParamList} from '../navigation/MainTabs';
 import {AppModal, AppModalClose} from '../components/ui';
+import {DailyStreakModal} from '../components/DailyStreakModal';
 import {colors, radii} from '../theme/tokens';
 import {fontFamily} from '../theme/typography';
-import {isToday, isYesterday, countDays, sumFormat} from '../utils/fortune';
+import {fetchStreakInfo} from '../api/streak';
 import {
   getFarmingBullcoinFillPercent,
   isFarmingClaimReady,
@@ -38,7 +39,6 @@ import {useSyncWalletWithBackend} from '../hooks/useSyncWalletWithBackend';
 import {
   TicketIcon,
   PointCoinIcon,
-  BalanceCoinIcon,
   BullcoinIcon,
 } from '../components/Icons';
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
@@ -98,48 +98,28 @@ export function HomeScreen() {
   const claimReady = isFarmingClaimReady(lastFarmingClaimAt, totalUnclaimed);
   const coinFilled = claimReady;
 
-  // ── Daily bonus modal ──
-  const [dailyBonusOpen, setDailyBonusOpen] = useState(false);
-  const [dailyReward, setDailyReward] = useState<{
-    point?: number;
-    balance?: number;
-  } | null>(null);
+  // ── Daily streak (full-screen) ──
+  const [dailyStreakOpen, setDailyStreakOpen] = useState(false);
+  const streakPromptShown = useRef(false);
 
-  const dailyBonusMut = useMutation({
-    mutationFn: async () => {
-      const {data} = await api.post('/api/users/daily');
-      return data;
-    },
-    onSuccess: () => refetchUser(),
+  const streakQuery = useQuery({
+    queryKey: ['streak'],
+    queryFn: fetchStreakInfo,
+    enabled: !!token,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
-    if (!userData?.lastBonusDate) {
+    if (!token || streakPromptShown.current) {
       return;
     }
-    if (!isToday(userData.lastBonusDate)) {
-      let countDaysVal =
-        typeof userData.countBonusDays === 'number'
-          ? userData.countBonusDays
-          : 1;
-      if (!isYesterday(userData.lastBonusDate)) {
-        countDaysVal = 1;
-      } else {
-        countDaysVal = (countDaysVal % 7) + 1;
-      }
-      const reward = countDays(countDaysVal);
-      if (reward) {
-        setDailyReward(reward);
-        setDailyBonusOpen(true);
-      }
+    if (streakQuery.data && !streakQuery.data.claimedToday) {
+      streakPromptShown.current = true;
+      setDailyStreakOpen(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData?.lastBonusDate]);
+  }, [token, streakQuery.data]);
 
-  const closeDailyBonus = async () => {
-    dailyBonusMut.mutate();
-    setDailyBonusOpen(false);
-  };
+  const closeDailyStreak = () => setDailyStreakOpen(false);
 
   // ── Mission modal ──
   const [missionModalOpen, setMissionModalOpen] = useState(false);
@@ -177,13 +157,13 @@ export function HomeScreen() {
       return um && um.status !== 'completed';
     });
     if (incomplete.length > 0 && (userData.miningSpeed ?? 0) > 1) {
-      if (!dailyBonusOpen) {
+      if (!dailyStreakOpen) {
         setMissionNames(incomplete);
         setMissionModalOpen(true);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionsQuery.isSuccess, userData, dailyBonusOpen]);
+  }, [missionsQuery.isSuccess, userData, dailyStreakOpen]);
 
   const closeMissionModal = () => setMissionModalOpen(false);
 
@@ -329,44 +309,14 @@ export function HomeScreen() {
         ) : null}
       </TouchableOpacity>
 
-      <AppModal
-        visible={dailyBonusOpen}
-        onClose={closeDailyBonus}
-        variant="bottomSheet">
-        <AppModalClose onPress={closeDailyBonus} />
-            <Text style={styles.modalTitle}>
-              {t('Claim your daily bonus and keep the rewards coming')}
-            </Text>
-            <View style={styles.modalInfo}>
-              <Text style={styles.modalInfoLabel}>{t('Reward')}:</Text>
-              {dailyReward && (
-                <View style={styles.rewardItems}>
-                  {dailyReward.point ? (
-                    <View style={styles.rewardItem}>
-                      <PointCoinIcon size={20} />
-                      <Text style={styles.rewardItemText}>
-                        {sumFormat(dailyReward.point)}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {dailyReward.balance ? (
-                    <View style={styles.rewardItem}>
-                      <BalanceCoinIcon size={20} />
-                      <Text style={styles.rewardItemText}>
-                        {sumFormat(dailyReward.balance)}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              )}
-            </View>
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={closeDailyBonus}
-              activeOpacity={0.85}>
-              <Text style={styles.primaryBtnText}>{t('Claim')}</Text>
-            </TouchableOpacity>
-      </AppModal>
+      <DailyStreakModal
+        visible={dailyStreakOpen}
+        onClose={closeDailyStreak}
+        onClaimed={() => {
+          refetchUser();
+          streakQuery.refetch();
+        }}
+      />
 
       <AppModal
         visible={missionModalOpen}

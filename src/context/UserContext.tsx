@@ -30,6 +30,14 @@ export type UserData = Record<string, unknown> & {
   referralBalance?: number;
   lastBonusDate?: string | null;
   countBonusDays?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  streakStartDate?: string | null;
+  claimedMilestones?: number[];
+  effectiveStreak?: number;
+  claimedToday?: boolean;
+  nextMilestone?: number | null;
+  daysUntilNextMilestone?: number | null;
   missions?: Array<{
     id: string;
     status: string;
